@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D1 · Rebold Audit</title>
+<link rel="icon" href="logo_white.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000;--card:#0E0E10;--card2:#151518;--line:#2B2B30;--line2:#3A3A40;
+  --ink:#FFFFFF;--ink2:#A6A6A8;--ink3:#76767C;--accent:#CD2B54;--accent2:#E04A70;
+  --b-crit:#E5484D;--b-opp:#F08A24;--b-func:#E3C343;--b-opt:#3DBE7A;--b-best:#33B7C9;
+  --s-pend:#76767C;--s-curso:#5B8DEF;--s-ok:#3DBE7A;--s-apoyo:#F08A24;--s-no:#E5484D;
+  --r:14px;--gut:16px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Poppins,system-ui,sans-serif;font-weight:300;font-size:14px;line-height:1.5}
+body{min-height:100vh;overflow-x:hidden}
+button,select,input,textarea{font:inherit;color:inherit}
+b,strong{font-weight:600}
+.wrap{max-width:1280px;margin:0 auto;padding:0 var(--gut)}
+/* header */
+header{position:sticky;top:0;z-index:20;background:rgba(0,0,0,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.hbar{display:flex;align-items:center;gap:16px;padding:12px 0;flex-wrap:wrap}
+.hbar img{height:22px}
+.htitle{display:flex;flex-direction:column;line-height:1.2}
+.htitle b{font-size:13px;letter-spacing:.08em;text-transform:uppercase}
+.htitle span{font-size:12px;color:var(--ink2)}
+.hspacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);border-radius:999px;padding:3px 10px;font-size:11px;font-weight:500;letter-spacing:.04em;white-space:nowrap}
+.pill.demo{border-color:var(--accent);color:var(--accent2)}
+.pill.live{border-color:var(--s-ok);color:var(--s-ok)}
+.who{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2)}
+.who select{background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:5px 8px;font-size:12px}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-bottom:0}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 12px;color:var(--ink2);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+nav.tabs button:hover{color:var(--ink)}
+nav.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs .n[hidden]{display:none}
+nav.tabs .n{display:inline-block;min-width:18px;padding:0 5px;margin-left:4px;border-radius:9px;background:var(--accent);color:#fff;font-size:10px;line-height:18px;text-align:center}
+main{padding:24px 0 64px}
+section.view{display:none}
+section.view.on{display:block}
+/* type */
+.kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent2);font-weight:600;margin:0 0 6px}
+h1,h2,h3{font-weight:700;margin:0;letter-spacing:.01em}
+h1{font-size:26px;text-transform:uppercase;line-height:1.15}
+h2{font-size:18px;text-transform:uppercase}
+h3{font-size:14px}
+.lead{color:var(--ink2);max-width:760px;margin:8px 0 0}
+.muted{color:var(--ink2)}.dim{color:var(--ink3)}
+.sec-head{margin:0 0 18px}
+/* cards & grids */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:960px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:1fr 1fr}}
+@media (max-width:640px){.g2,.g3,.g4{grid-template-columns:1fr}h1{font-size:21px}}
+.mt{margin-top:14px}.mt2{margin-top:28px}
+/* hero ORI */
+.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.4fr);gap:14px}
+@media (max-width:900px){.hero{grid-template-columns:1fr}}
+.ori-num{display:flex;align-items:flex-end;gap:14px;margin:6px 0 4px}
+.ori-num .big{font-size:96px;font-weight:700;line-height:.9;letter-spacing:-.03em}
+.ori-num .of{font-size:18px;color:var(--ink3);padding-bottom:8px}
+.band{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.band i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.scale{position:relative;margin:26px 0 8px}
+.scale .bar{display:flex;height:10px;border-radius:6px;overflow:hidden;gap:2px}
+.scale .bar span{display:block;height:100%;opacity:.85}
+.scale .mk{position:absolute;top:-20px;transform:translateX(-50%);font-size:11px;font-weight:600;white-space:nowrap}
+.scale .mk:after{content:"";display:block;width:2px;height:16px;margin:2px auto 0;background:currentColor}
+.scale .lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-top:6px}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}
+.trio div{border-top:1px solid var(--line);padding-top:10px}
+.trio b{display:block;font-size:22px;font-weight:600}
+.trio span{font-size:11px;color:var(--ink2)}
+/* indicator cards */
+.ind{cursor:pointer;transition:border-color .15s,transform .15s;position:relative}
+.ind:hover{border-color:var(--line2);transform:translateY(-1px)}
+.ind.sel{border-color:var(--accent)}
+.ind .id{font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--ink2)}
+.ind .nm{font-size:12px;color:var(--ink3);min-height:36px}
+.ind .sc{font-size:44px;font-weight:700;line-height:1;margin:8px 0 6px}
+.ind .sc small{font-size:14px;color:var(--ink3);font-weight:400}
+.meter{height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin:10px 0 8px;display:flex}
+.meter span{display:block;height:100%}
+.delta{font-size:12px;font-weight:600}
+.delta.up{color:var(--s-ok)}.delta.zero{color:var(--ink3)}
+/* chart */
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--ink2);font-family:Poppins,sans-serif;font-size:11px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:6px}
+.tip{position:fixed;z-index:60;pointer-events:none;background:#1C1C20;border:1px solid var(--line2);border-radius:8px;padding:8px 10px;font-size:12px;opacity:0;transition:opacity .1s;max-width:240px}
+/* tables */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:500;font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl tr.click{cursor:pointer}
+.tbl tr.click:hover td{background:var(--card2)}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tscroll{overflow-x:auto}
+.hbarc{display:flex;align-items:center;gap:8px;min-width:120px}
+.hbarc .t{flex:1;height:6px;background:var(--line);border-radius:4px;overflow:hidden}
+.hbarc .t span{display:block;height:100%;border-radius:0 4px 4px 0}
+/* chips */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;border:1px solid var(--line2);color:var(--ink2)}
+.chip i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.chip.qw{border-color:var(--accent);color:var(--accent2)}
+.chip.ok{border-color:var(--s-ok);color:var(--s-ok)}
+.chip.wait{border-color:var(--b-func);color:var(--b-func)}
+.chip.bad{border-color:var(--s-no);color:var(--s-no)}
+.chip.info{border-color:var(--s-curso);color:var(--s-curso)}
+/* filters */
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:14px}
+.filters label{display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
+.filters select,.filters input,.field select,.field input,.field textarea{background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:7px 9px;font-size:13px;min-width:0}
+.filters input[type=search]{min-width:180px}
+.btn{background:var(--card2);border:1px solid var(--line2);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer}
+.btn:hover{border-color:var(--ink3)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{background:var(--accent2)}
+.btn.ok{background:var(--s-ok);border-color:var(--s-ok);color:#06210f}
+.btn.ghost{background:none}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+.seg button{background:none;border:0;padding:7px 12px;font-size:12px;cursor:pointer;color:var(--ink2)}
+.seg button.on{background:var(--accent);color:#fff}
+/* kpi */
+.kpi .v{font-size:30px;font-weight:700;line-height:1.1}
+.kpi .l{font-size:12px;color:var(--ink2)}
+.kpi .s{font-size:11px;color:var(--ink3);margin-top:4px}
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100vw);background:#09090B;border-left:1px solid var(--line);z-index:41;transform:translateX(100%);transition:transform .25s ease;overflow-y:auto;padding:22px 20px 40px}
+.drawer.on{transform:none}
+.drawer .x{position:absolute;top:14px;right:14px}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:13px;margin:14px 0}
+.kv dt{color:var(--ink3)}.kv dd{margin:0}
+.box{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:14px;background:var(--card)}
+.field{display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:12px;color:var(--ink2)}
+.field textarea{min-height:70px;resize:vertical}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.opts button{text-align:left;background:var(--card2);border:1px solid var(--line2);border-radius:10px;padding:10px;cursor:pointer;font-size:13px;display:flex;gap:8px;align-items:center}
+.opts button.on{border-color:var(--accent);background:#1a0a10}
+.timeline{list-style:none;margin:10px 0 0;padding:0;border-left:1px solid var(--line2)}
+.timeline li{position:relative;padding:0 0 14px 16px;font-size:12px}
+.timeline li:before{content:"";position:absolute;left:-5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--ink3)}
+.timeline li.v:before{background:var(--s-ok)}
+.timeline li .t{color:var(--ink3)}
+/* toast */
+.toasts{position:fixed;bottom:16px;right:16px;z-index:70;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw - 32px))}
+.toast{background:#141417;border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:10px;padding:10px 12px;font-size:12px;animation:tin .2s ease}
+.toast b{display:block;font-size:12px;margin-bottom:2px}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* rubric */
+.rub{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:10px}
+@media (max-width:820px){.rub{grid-template-columns:1fr}}
+.rub div{border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12px;color:var(--ink2);background:var(--card2)}
+.rub div b{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;color:var(--ink)}
+.rub div.cur{border-color:var(--accent);color:var(--ink)}
+.rub div.cur b:after{content:" · hoy";color:var(--accent2)}
+.note{border:1px dashed var(--line2);border-radius:12px;padding:12px 14px;font-size:12px;color:var(--ink2)}
+.flow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px}
+.flow span{border:1px solid var(--line2);border-radius:8px;padding:6px 10px}
+.flow em{font-style:normal;color:var(--ink3)}
+.empty{padding:30px;text-align:center;color:var(--ink3)}
+/* login */
+.modal{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.8);padding:16px}
+.modal.on{display:flex}
+.modal .card{width:min(420px,100%)}
+footer{border-top:1px solid var(--line);padding:18px 0;color:var(--ink3);font-size:11px}
+/* responsive table -> cards */
+@media (max-width:760px){
+  #recTable thead{display:none}
+  #recTable tr{display:block;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;padding:6px}
+  #recTable td{display:flex;justify-content:space-between;gap:10px;border:0;padding:5px 8px}
+  #recTable td:before{content:attr(data-l);color:var(--ink3);font-size:11px;text-transform:uppercase;flex-shrink:0}
+  #recTable td.ttl{display:block}#recTable td.ttl:before{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="hbar">
+      <img src="logo_white.png" alt="Rebold">
+      <div class="htitle"><b>D1 · Rebold Audit</b><span>Cuadro de mando de optimizaciones · Zelva</span></div>
+      <span id="modePill" class="pill demo">DEMO · datos ficticios</span>
+      <div class="hspacer"></div>
+      <div class="who" id="whoBox"></div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-v="ori" class="on">1 · ORI</button>
+      <button data-v="ind">2 · Indicadores y criterios</button>
+      <button data-v="seg">3 · Seguimiento <span class="n" id="nPend" hidden></span></button>
+      <button data-v="efi">4 · Eficiencia</button>
+      <button data-v="log">5 · Bitácora</button>
+      <button data-v="rub">6 · Rúbrica</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- 1 · ORI -->
+  <section class="view on" id="v-ori">
+    <div class="sec-head">
+      <p class="kicker">01 · Macro · Optimization Readiness Index</p>
+      <h1>El ORI solo se mueve con <span style="color:var(--accent2)">ajustes validados</span></h1>
+      <p class="lead">ORI = 25% AES + 25% CES + 25% UXCS + 25% AIS. Zelva reporta cada ajuste; el puntaje cambia únicamente cuando Jennifer lo aprueba. Lo que espera validación se muestra aparte como potencial.</p>
+    </div>
+    <div class="hero">
+      <div class="card">
+        <p class="kicker" style="color:var(--ink2)">ORI validado hoy</p>
+        <div class="ori-num"><span class="big" id="oriBig">–</span><span class="of">/ 100</span></div>
+        <div id="oriBand"></div>
+        <div class="scale" id="oriScale"></div>
+        <div class="trio" id="oriTrio"></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
+          <h3>Ruta del ORI · plan de 6 semanas</h3>
+          <span class="dim" style="font-size:11px">Semana 1 inicia el <span id="startLbl"></span></span>
+        </div>
+        <div id="routeChart"></div>
+        <div class="legend"><span><i style="border-color:var(--ink3);border-top-style:dashed"></i>Ruta estimada por la auditoría</span><span><i style="border-color:var(--accent)"></i>ORI validado por Jennifer</span><span><i style="border-color:var(--b-func);border-top-style:dotted"></i>Potencial si se aprueba lo pendiente</span></div>
+      </div>
+    </div>
+    <div class="mt2" style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+      <div><p class="kicker">02 · Los cuatro indicadores</p><h2>Qué arrastra el promedio</h2></div>
+      <span class="dim" style="font-size:12px">Toca un indicador para ver sus criterios</span>
+    </div>
+    <div class="grid g4 mt" id="oriInds"></div>
+    <div class="grid g3 mt2" id="oriStatus"></div>
+  </section>
+
+  <!-- 2 · Indicadores -->
+  <section class="view" id="v-ind">
+    <div class="sec-head">
+      <p class="kicker">02 · Meso y micro · Indicadores y criterios</p>
+      <h1>Cada indicador, criterio por criterio</h1>
+      <p class="lead">Cada criterio se califica de 0 a 10 con la rúbrica y pesa distinto dentro de su indicador. El puntaje actual es la línea base de la auditoría más los ajustes aprobados.</p>
+    </div>
+    <div class="grid g4" id="indCards"></div>
+    <div class="card mt" id="indDetail"></div>
+  </section>
+
+  <!-- 3 · Seguimiento -->
+  <section class="view" id="v-seg">
+    <div class="sec-head" style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <p class="kicker">03 · Seguimiento de optimizaciones</p>
+        <h1>Qué se ajustó, quién lo valida y qué falta</h1>
+        <p class="lead">Zelva marca cada recomendación como realizada, en curso, con necesidad de apoyo o no realizable, con el porqué. Cada cambio notifica a Jennifer por Slack.</p>
+      </div>
+      <button class="btn pri" id="btnAdd" hidden>+ Nueva recomendación</button>
+    </div>
+    <div class="flow" style="margin-bottom:16px">
+      <span>Rebold registra hallazgo <em>(fecha y hora)</em></span><em>→</em>
+      <span>Zelva reporta estado + porqué</span><em>→</em>
+      <span>Slack a Jennifer</span><em>→</em>
+      <span style="border-color:var(--s-ok);color:var(--s-ok)">Jennifer aprueba → se mueve el ORI</span>
+    </div>
+    <div class="filters" id="filters">
+      <label>Buscar<input type="search" id="fQ" placeholder="Título, hallazgo, ID…"></label>
+      <label>Indicador<select id="fInd"></select></label>
+      <label>Criterio<select id="fCrit"></select></label>
+      <label>Horizonte<select id="fHor"></select></label>
+      <label>Estado Zelva<select id="fEst"></select></label>
+      <label>Validación<select id="fVal"></select></label>
+      <label>Fecha<select id="fFecha"><option value="fecha_limite">Límite</option><option value="fecha_alta">Alta</option><option value="fecha_estado">Último cambio</option><option value="fecha_validacion">Validación</option></select></label>
+      <label>Desde<input type="date" id="fDesde"></label>
+      <label>Hasta<input type="date" id="fHasta"></label>
+      <button class="btn ghost" id="fClear">Limpiar</button>
+    </div>
+    <div class="dim" style="font-size:12px;margin-bottom:8px" id="recCount"></div>
+    <div class="card" style="padding:6px 8px">
+      <div class="tscroll"><table class="tbl" id="recTable"><thead><tr><th>ID</th><th>Recomendación</th><th>Indicador · criterio</th><th>Horizonte</th><th>Límite</th><th>Estado Zelva</th><th>Validación</th><th class="num">Impacto ORI</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- 4 · Eficiencia -->
+  <section class="view" id="v-efi">
+    <div class="sec-head" style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <p class="kicker">04 · Eficiencia en los ajustes</p>
+        <h1>Cuánto tarda cada ajuste en cerrarse</h1>
+        <p class="lead">Se mide desde que Rebold sube el hallazgo (fecha y hora) hasta que Zelva lo reporta, y desde ahí hasta la validación de Jennifer.</p>
+      </div>
+      <button class="btn" id="btnExportEfi">Exportar CSV</button>
+    </div>
+    <div class="grid g4" id="efiKpis"></div>
+    <div class="grid mt">
+      <div class="card"><h3>Por indicador</h3><div class="tscroll" id="efiInd"></div></div>
+      <div class="card"><h3>Por horizonte</h3><div class="tscroll" id="efiHor"></div></div>
+    </div>
+    <div class="card mt"><h3>Vencidas o en riesgo</h3><div class="tscroll" id="efiLate"></div></div>
+  </section>
+
+  <!-- 5 · Bitácora -->
+  <section class="view" id="v-log">
+    <div class="sec-head" style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-end">
+      <div>
+        <p class="kicker">05 · Trazabilidad</p>
+        <h1>Bitácora de cambios</h1>
+        <p class="lead">Cada alta, cambio de estado y validación queda registrada con fecha, hora y usuario. En producción se escribe en la hoja <b>Log_Cambios</b> y en un Google Sheet de respaldo independiente.</p>
+      </div>
+      <button class="btn" id="btnExportLog">Exportar CSV</button>
+    </div>
+    <div class="filters">
+      <label>Buscar<input type="search" id="lQ" placeholder="ID, usuario, comentario…"></label>
+      <label>Acción<select id="lAcc"></select></label>
+      <label>Rol<select id="lRol"></select></label>
+    </div>
+    <div class="card" style="padding:6px 8px"><div class="tscroll"><table class="tbl" id="logTable"><thead><tr><th>Fecha y hora</th><th>ID</th><th>Acción</th><th>Antes → después</th><th>Usuario</th><th>Comentario</th></tr></thead><tbody></tbody></table></div></div>
+  </section>
+
+  <!-- 6 · Rúbrica -->
+  <section class="view" id="v-rub">
+    <div class="sec-head">
+      <p class="kicker">06 · Consulta</p>
+      <h1>Rúbrica de scoring</h1>
+      <p class="lead">Qué evidencia corresponde a cada banda (0 a 10) en cada criterio. Es la misma rúbrica que usa operaciones al cargar <b>Mediciones_Mensuales</b>. La banda resaltada es donde está D1 hoy.</p>
+    </div>
+    <div class="filters"><div class="seg" id="rubSeg"></div></div>
+    <div id="rubList"></div>
+  </section>
+</main>
+
+<footer><div class="wrap">Rebold · A Post Digital Marketing &amp; Communication Company · <span id="footSrc"></span></div></footer>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<div class="tip" id="tip"></div>
+<div class="toasts" id="toasts"></div>
+<div class="modal" id="login"><div class="card">
+  <p class="kicker">Acceso</p><h2>D1 · Rebold Audit</h2>
+  <p class="muted" style="font-size:13px">Escribe tu nombre y el código de acceso que te dio Rebold. El código define si entras como Zelva, Rebold o validadora.</p>
+  <div class="field">Nombre<input id="lgName" autocomplete="name"></div>
+  <div class="field">Código de acceso<input id="lgCode" type="password" autocomplete="off"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px"><span class="dim" id="lgErr" style="font-size:12px"></span><button class="btn pri" id="lgGo">Entrar</button></div>
+</div></div>
+
+<script src="demo-data.js"></script>
+<script>
+/* ===================== Configuración ===================== */
+const CONFIG = {
+  // URL del Web App de Apps Script (apps-script/Code.gs). Vacío = modo DEMO con datos ficticios.
+  BACKEND_URL: '',
+  VALIDADORA: 'Jennifer Carvajal',
+};
+const DEMO = !CONFIG.BACKEND_URL;
+const LS = { demo: 'd1audit_demo_v1', user: 'd1audit_user_v1' };
+
+const BANDS = [
+  { min: 0, max: 39, name: 'Crítico', c: 'var(--b-crit)' },
+  { min: 40, max: 59, name: 'Oportunidad alta', c: 'var(--b-opp)' },
+  { min: 60, max: 74, name: 'Funcional / Optimizable', c: 'var(--b-func)' },
+  { min: 75, max: 89, name: 'Optimizado', c: 'var(--b-opt)' },
+  { min: 90, max: 100, name: 'Best in class', c: 'var(--b-best)' },
+];
+const RUB_BANDS = ['0–2 · Crítico', '3–4 · Débil', '5–6 · Aceptable', '7–8 · Bueno', '9–10 · Excelente'];
+const ESTADOS = {
+  'Pendiente': { c: 'var(--s-pend)' }, 'En curso': { c: 'var(--s-curso)' }, 'Realizado': { c: 'var(--s-ok)' },
+  'Necesita apoyo': { c: 'var(--s-apoyo)' }, 'No se pudo realizar': { c: 'var(--s-no)' },
+};
+const VALS = {
+  'Sin enviar': '', 'Pendiente validación': 'wait', 'Aprobado': 'ok', 'Devuelto': 'bad',
+  'Cierre ratificado': 'info', 'Apoyo en gestión': 'info',
+};
+const HORS = ['Quick win', 'Mediano plazo', 'Largo plazo'];
+const ROLES = { zelva: 'Zelva', rebold: 'Rebold', validador: 'Validadora (Jennifer)', lectura: 'Solo lectura' };
+
+/* ===================== Estado ===================== */
+let D = null;          // datos: indicadores, criterios, rubrica, base, recomendaciones, log
+let USER = { name: '', role: 'lectura', code: '' };
+let selInd = 'AES', rubInd = 'AES';
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt1 = n => n == null || isNaN(n) ? '–' : (Math.round(n * 10) / 10).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmt0 = n => n == null || isNaN(n) ? '–' : Math.round(n).toLocaleString('es-CO');
+const bandOf = v => BANDS.find(b => v <= b.max + 0.999) || BANDS[4];
+const nowIso = () => { const d = new Date(); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
+const toDate = s => s ? new Date(s.length <= 10 ? s + 'T23:59:59' : s) : null;
+const fDate = s => { if (!s) return '–'; const d = toDate(s); return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }); };
+const fDT = s => { if (!s) return '–'; const d = toDate(s); return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }); };
+const hoursBetween = (a, b) => (toDate(b) - toDate(a)) / 36e5;
+const fDur = h => h == null || isNaN(h) ? '–' : h < 24 ? fmt1(h) + ' h' : fmt1(h / 24) + ' d';
+const avg = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
+const critById = id => D.criterios.find(c => c.id === id);
+const indById = id => D.indicadores.find(i => i.id === id);
+
+/* ===================== Cálculo del ORI ===================== */
+// Score de cada criterio = línea base (última medición) + deltas de recomendaciones APROBADAS por Jennifer
+// después de esa medición. Con includePending suma también lo realizado que espera validación (potencial).
+function scores(opts = {}) {
+  const { asOf = null, includePending = false } = opts;
+  const lim = asOf ? toDate(asOf) : null;
+  const baseDate = toDate(D.fecha_base);
+  const crit = {};
+  D.criterios.forEach(c => { crit[c.id] = D.base[c.id] == null ? null : +D.base[c.id]; });
+  D.recomendaciones.forEach(r => {
+    if (crit[r.criterio] == null || r.estado !== 'Realizado') return;
+    const ok = r.validacion === 'Aprobado' && toDate(r.fecha_validacion) > baseDate && (!lim || toDate(r.fecha_validacion) <= lim);
+    const pend = includePending && r.validacion === 'Pendiente validación';
+    if (ok || pend) crit[r.criterio] = Math.min(10, crit[r.criterio] + (+r.delta || 0));
+  });
+  const ind = {};
+  D.indicadores.forEach(i => {
+    let s = 0, w = 0;
+    D.criterios.filter(c => c.ind === i.id).forEach(c => { if (crit[c.id] != null) { s += c.peso * crit[c.id]; w += c.peso; } });
+    ind[i.id] = w ? s / w * 10 : null;
+  });
+  const vals = Object.values(ind).filter(v => v != null);
+  const ori = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  return { crit, ind, ori };
+}
+const recDeltaOri = r => { const c = critById(r.criterio); return c ? c.peso * (+r.delta || 0) * 10 / 4 : 0; };
+
+/* ===================== Datos (demo / backend) ===================== */
+async function api(action, payload = {}) {
+  if (DEMO) return demoApi(action, payload);
+  const body = JSON.stringify({ action, code: USER.code, usuario: USER.name, ...payload });
+  const res = await fetch(CONFIG.BACKEND_URL, { method: 'POST', body, headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
+  const j = await res.json();
+  if (!j.ok) throw new Error(j.error || 'Error del backend');
+  return j;
+}
+async function loadData() {
+  if (DEMO) {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(LS.demo) || 'null'); } catch (e) { }
+    D = JSON.parse(JSON.stringify(window.DEMO_DATA));
+    if (saved && saved.recomendaciones) { D.recomendaciones = saved.recomendaciones; D.log = saved.log; }
+    return;
+  }
+  const url = CONFIG.BACKEND_URL + '?action=data&code=' + encodeURIComponent(USER.code);
+  const j = await (await fetch(url)).json();
+  if (!j.ok) throw new Error(j.error || 'No autorizado');
+  USER.role = j.role;
+  D = j.data;
+}
+function saveDemo() { try { localStorage.setItem(LS.demo, JSON.stringify({ recomendaciones: D.recomendaciones, log: D.log })); } catch (e) { } }
+
+// Réplica en el navegador de la lógica de Apps Script (solo modo demo)
+function demoApi(action, p) {
+  const ts = nowIso();
+  const rolLbl = { zelva: 'Zelva', rebold: 'Rebold', validador: 'Validador' }[USER.role] || USER.role;
+  const L = (rec, accion, antes, despues, comentario) => D.log.push({ ts, usuario: USER.name || rolLbl, rol: rolLbl, accion, id: rec.id, antes, despues, comentario: comentario || '' });
+  let rec, slack = '';
+  if (action === 'estado') {
+    rec = D.recomendaciones.find(r => r.id === p.id);
+    const antes = rec.estado;
+    rec.estado = p.estado; rec.comentario = p.comentario || ''; rec.fecha_estado = ts;
+    if (p.estado === 'Realizado') rec.fecha_realizado = ts;
+    rec.validacion = ['Realizado', 'Necesita apoyo', 'No se pudo realizar'].includes(p.estado) ? 'Pendiente validación' : 'Sin enviar';
+    rec.validado_por = ''; rec.fecha_validacion = ''; rec.comentario_validacion = '';
+    L(rec, 'Cambio de estado', antes, p.estado, p.comentario);
+    slack = `${rec.id} · ${rec.titulo}: ${antes} → ${p.estado}`;
+  } else if (action === 'validar') {
+    rec = D.recomendaciones.find(r => r.id === p.id);
+    const antes = rec.validacion;
+    const map = { aprobar: 'Aprobado', devolver: 'Devuelto', ratificar: 'Cierre ratificado', apoyo: 'Apoyo en gestión' };
+    rec.validacion = map[p.decision]; rec.validado_por = USER.name || CONFIG.VALIDADORA; rec.fecha_validacion = ts; rec.comentario_validacion = p.comentario || '';
+    if (p.decision === 'devolver') { rec.estado = 'En curso'; rec.fecha_estado = ts; }
+    L(rec, rec.validacion, antes, rec.validacion, p.comentario);
+    slack = p.decision === 'aprobar' ? `${rec.id} aprobado: el ORI se recalcula` : '';
+  } else if (action === 'alta') {
+    const n = D.recomendaciones.reduce((m, r) => Math.max(m, +r.id.slice(1) || 0), 0) + 1;
+    rec = Object.assign({ id: 'R' + String(n).padStart(2, '0'), fecha_alta: ts, estado: 'Pendiente', comentario: '', fecha_estado: '', fecha_realizado: '', validacion: 'Sin enviar', validado_por: '', fecha_validacion: '', comentario_validacion: '' }, p.rec);
+    D.recomendaciones.push(rec);
+    L(rec, 'Alta de recomendación', '', 'Pendiente', rec.titulo);
+    slack = `Nueva recomendación ${rec.id}: ${rec.titulo}`;
+  }
+  saveDemo();
+  return { ok: true, rec, slack: slack ? { simulated: true, text: slack } : null };
+}
+
+/* ===================== Render: ORI ===================== */
+function bandHtml(v) { const b = bandOf(v ?? 0); return `<span class="band" style="color:${b.c}"><i style="background:${b.c}"></i>${b.name}</span>`; }
+function renderOri() {
+  const S = scores(), P = scores({ includePending: true }), A = scores({ asOf: D.fecha_base });
+  $('#oriBig').textContent = fmt0(S.ori);
+  $('#oriBand').innerHTML = bandHtml(S.ori);
+  const seg = BANDS.map(b => `<span style="flex:${b.max - b.min + 1};background:${b.c}"></span>`).join('');
+  const mk = (v, label, color) => v == null ? '' : `<span class="mk" style="left:${Math.min(100, v)}%;color:${color}">${label}</span>`;
+  $('#oriScale').innerHTML = `<div class="bar">${seg}</div>${mk(S.ori, 'Hoy ' + fmt0(S.ori), '#fff')}<div class="lbl"><span>0</span><span>40</span><span>60</span><span>75</span><span>90</span><span>100</span></div>`;
+  const meta = D.ruta_estimada[D.ruta_estimada.length - 1];
+  $('#oriTrio').innerHTML = `
+    <div><b>${fmt0(A.ori)}</b><span>ORI de la auditoría (línea base)</span></div>
+    <div><b style="color:var(--b-func)">${fmt0(P.ori)}</b><span>Potencial si Jennifer aprueba lo pendiente</span></div>
+    <div><b>${meta}</b><span>Meta estimada a la semana 6</span></div>`;
+  $('#startLbl').textContent = fDate(D.inicio_plan);
+  renderRoute();
+  $('#oriInds').innerHTML = D.indicadores.map(i => indCard(i, S, A, P)).join('');
+  document.querySelectorAll('#oriInds .ind').forEach(el => el.onclick = () => { selInd = el.dataset.id; go('ind'); });
+  // estado de recomendaciones
+  const R = D.recomendaciones;
+  const cnt = f => R.filter(f).length;
+  const pendVal = cnt(r => r.validacion === 'Pendiente validación');
+  const aprob = cnt(r => r.validacion === 'Aprobado');
+  const qw = R.filter(r => r.horizonte === 'Quick win');
+  const qwDone = qw.filter(r => r.validacion === 'Aprobado').length;
+  const apoyo = cnt(r => r.estado === 'Necesita apoyo');
+  $('#oriStatus').innerHTML = `
+    <div class="card kpi"><div class="l">Ajustes aprobados por Jennifer</div><div class="v">${aprob}<span class="dim" style="font-size:16px"> / ${R.length}</span></div><div class="meter"><span style="width:${aprob / R.length * 100}%;background:var(--s-ok)"></span></div><div class="s">Quick wins aprobados: ${qwDone} de ${qw.length}</div></div>
+    <div class="card kpi" style="cursor:pointer" onclick="quickFilter({fVal:'Pendiente validación'})"><div class="l">Esperando validación de Jennifer</div><div class="v" style="color:var(--b-func)">${pendVal}</div><div class="s">No mueven el ORI hasta ser aprobados · ver lista →</div></div>
+    <div class="card kpi" style="cursor:pointer" onclick="quickFilter({fEst:'Necesita apoyo'})"><div class="l">Zelva necesita apoyo</div><div class="v" style="color:var(--s-apoyo)">${apoyo}</div><div class="s">Ver lista →</div></div>`;
+}
+function indCard(i, S, A, P) {
+  const v = S.ind[i.id], a = A.ind[i.id], p = P.ind[i.id], b = bandOf(v ?? 0);
+  const d = v != null && a != null ? v - a : 0;
+  return `<div class="card ind ${selInd === i.id && $('#v-ind').classList.contains('on') ? 'sel' : ''}" data-id="${i.id}">
+    <div class="id">${i.id} · ${esc(i.corto)}</div><div class="nm">${esc(i.nombre)}</div>
+    <div class="sc">${fmt1(v)} <small>/ 100</small></div>
+    <div class="meter"><span style="width:${v ?? 0}%;background:${b.c}"></span>${p > v ? `<span style="width:${p - v}%;background:${b.c};opacity:.35"></span>` : ''}</div>
+    ${bandHtml(v)}
+    <div class="delta ${d > 0.05 ? 'up' : 'zero'}" style="margin-top:6px">${d > 0.05 ? '▲ +' + fmt1(d) : '= ' + fmt1(0)} vs. auditoría${p - v > 0.05 ? ` · <span style="color:var(--b-func)">+${fmt1(p - v)} por validar</span>` : ''}</div>
+  </div>`;
+}
+function weekDate(w) { const d = toDate(D.inicio_plan); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 7 * w); return d; }
+function renderRoute() {
+  const W = 640, H = 260, pl = 34, pr = 16, pt = 16, pb = 34;
+  const est = D.ruta_estimada;
+  const ymin = 40, ymax = 70;
+  const x = w => pl + (W - pl - pr) * w / (est.length - 1);
+  const y = v => pt + (H - pt - pb) * (1 - (v - ymin) / (ymax - ymin));
+  const today = new Date();
+  const wToday = (today - weekDate(0)) / (7 * 864e5);
+  let g = '';
+  for (let v = ymin; v <= ymax; v += 10) g += `<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="#2B2B30"/><text x="${pl - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  // banda 60 (funcional)
+  g += `<line x1="${pl}" x2="${W - pr}" y1="${y(60)}" y2="${y(60)}" stroke="var(--b-func)" stroke-opacity=".35" stroke-dasharray="2 4"/><text x="${pl + 6}" y="${y(60) - 6}" style="fill:var(--b-func);font-size:10px">Funcional · 60</text>`;
+  est.forEach((v, w) => g += `<text x="${x(w)}" y="${H - 12}" text-anchor="middle">${w === 0 ? 'Inicio' : 'S' + w}</text>`);
+  g += `<polyline fill="none" stroke="#76767C" stroke-width="2" stroke-dasharray="5 5" points="${est.map((v, w) => x(w) + ',' + y(v)).join(' ')}"/>`;
+  // serie validada: fin de cada semana transcurrida + hoy
+  const pts = [];
+  for (let w = 0; w < est.length; w++) {
+    const end = weekDate(w); if (w > 0) end.setSeconds(-1);
+    if (end > today) break;
+    pts.push({ w, v: scores({ asOf: w === 0 ? D.fecha_base : end.toISOString() }).ori, lbl: w === 0 ? 'Línea base' : 'Cierre semana ' + w });
+  }
+  const wt = Math.max(0, Math.min(est.length - 1, wToday));
+  const Sv = scores().ori, Pv = scores({ includePending: true }).ori;
+  if (wToday >= 0 && wToday <= est.length - 1) pts.push({ w: wt, v: Sv, lbl: 'Hoy', today: true });
+  if (pts.length) {
+    g += `<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="${pts.map(p => x(p.w) + ',' + y(p.v)).join(' ')}"/>`;
+    if (Pv > Sv + 0.05) g += `<line x1="${x(wt)}" x2="${x(wt)}" y1="${y(Sv)}" y2="${y(Pv)}" stroke="var(--b-func)" stroke-width="2" stroke-dasharray="2 3"/><circle cx="${x(wt)}" cy="${y(Pv)}" r="4" fill="var(--bg)" stroke="var(--b-func)" stroke-width="2" data-tip="Potencial con pendientes|${fmt1(Pv)}"/>`;
+    pts.forEach(p => g += `<circle cx="${x(p.w)}" cy="${y(p.v)}" r="${p.today ? 6 : 4.5}" fill="var(--accent)" stroke="var(--bg)" stroke-width="2" data-tip="${p.lbl}|ORI validado ${fmt1(p.v)}"/>`);
+    const last = pts[pts.length - 1];
+    g += `<text x="${x(last.w) + 10}" y="${y(last.v) + 4}" style="fill:#fff;font-weight:600;font-size:12px">${fmt0(last.v)}</text>`;
+  }
+  est.forEach((v, w) => g += `<circle cx="${x(w)}" cy="${y(v)}" r="10" fill="transparent" data-tip="${w === 0 ? 'Inicio' : 'Semana ' + w}|Estimado ${v}"/>`);
+  $('#routeChart').innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Ruta estimada del ORI frente al ORI validado">${g}</svg>`;
+  bindTips($('#routeChart'));
+}
+function bindTips(root) {
+  const tip = $('#tip');
+  root.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('mouseenter', e => { const [a, b] = el.dataset.tip.split('|'); tip.innerHTML = `<b>${esc(a)}</b><br>${esc(b)}`; tip.style.opacity = 1; });
+    el.addEventListener('mousemove', e => { tip.style.left = Math.min(innerWidth - 250, e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; });
+    el.addEventListener('mouseleave', () => tip.style.opacity = 0);
+  });
+}
+
+/* ===================== Render: Indicadores ===================== */
+function renderInd() {
+  const S = scores(), A = scores({ asOf: D.fecha_base }), P = scores({ includePending: true });
+  $('#indCards').innerHTML = D.indicadores.map(i => indCard(i, S, A, P)).join('');
+  document.querySelectorAll('#indCards .ind').forEach(el => el.onclick = () => { selInd = el.dataset.id; renderInd(); });
+  const i = indById(selInd);
+  const crits = D.criterios.filter(c => c.ind === selInd);
+  const rows = crits.map(c => {
+    const cur = S.crit[c.id], base = A.crit[c.id], pot = P.crit[c.id];
+    const recs = D.recomendaciones.filter(r => r.criterio === c.id);
+    const ap = recs.filter(r => r.validacion === 'Aprobado').length;
+    const b = bandOf(cur == null ? 0 : cur * 10);
+    return `<tr>
+      <td><b style="font-weight:500">${esc(c.nombre)}</b><div class="dim" style="font-size:11px">${c.id} · ${esc(c.evalua)}</div></td>
+      <td class="num">${Math.round(c.peso * 100)}%</td>
+      <td class="num">${fmt1(base)}</td>
+      <td class="num"><b>${fmt1(cur)}</b>${cur - base > 0.05 ? `<div class="delta up">+${fmt1(cur - base)}</div>` : ''}</td>
+      <td><div class="hbarc"><div class="t"><span style="width:${(cur ?? 0) * 10}%;background:${b.c}"></span></div><span class="num" style="width:44px">${fmt0((cur ?? 0) * 10)}%</span></div>${pot - cur > 0.05 ? `<div style="font-size:11px;color:var(--b-func)">+${fmt1(pot - cur)} por validar</div>` : ''}</td>
+      <td class="num">${fmt1(cur == null ? null : c.peso * cur * 10)}</td>
+      <td class="num"><a href="#" class="muted" onclick="quickFilter({fInd:'${c.ind}',fCrit:'${c.id}'});return false">${ap} / ${recs.length}</a></td>
+    </tr>`;
+  }).join('');
+  const v = S.ind[selInd];
+  $('#indDetail').innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
+      <div><p class="kicker">${i.id} · ${esc(i.hub)}</p><h2>${esc(i.nombre)}</h2><p class="muted" style="margin:4px 0 0;font-size:13px">${esc(i.mide)}</p></div>
+      <div style="text-align:right"><div style="font-size:34px;font-weight:700;line-height:1">${fmt1(v)}</div>${bandHtml(v)}</div>
+    </div>
+    <div class="tscroll mt"><table class="tbl">
+      <thead><tr><th>Criterio</th><th class="num">Peso</th><th class="num">Auditoría (0–10)</th><th class="num">Actual (0–10)</th><th>Porcentaje</th><th class="num">Aporta al ${i.id}</th><th class="num">Ajustes aprobados</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td><b>${i.id}</b> = promedio ponderado × 10</td><td class="num">100%</td><td></td><td></td><td></td><td class="num"><b>${fmt1(v)}</b></td><td></td></tr></tfoot>
+    </table></div>
+    <p class="dim" style="font-size:11px;margin:10px 0 0">“Aporta” = peso × score × 10. La suma de la columna es el puntaje del indicador. <a href="#" class="muted" onclick="rubInd='${i.id}';go('rub');return false">Ver la rúbrica de ${i.id} →</a></p>`;
+}
+
+/* ===================== Render: Seguimiento ===================== */
+function fillSelect(sel, opts, all = 'Todos') {
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">${all}</option>` + opts.map(o => typeof o === 'string' ? `<option>${esc(o)}</option>` : `<option value="${esc(o.v)}">${esc(o.t)}</option>`).join('');
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+}
+function setupFilters() {
+  fillSelect($('#fInd'), D.indicadores.map(i => ({ v: i.id, t: i.id + ' · ' + i.corto })));
+  fillSelect($('#fHor'), HORS);
+  fillSelect($('#fEst'), Object.keys(ESTADOS));
+  fillSelect($('#fVal'), Object.keys(VALS));
+  updateCritFilter();
+  ['fQ', 'fInd', 'fCrit', 'fHor', 'fEst', 'fVal', 'fFecha', 'fDesde', 'fHasta'].forEach(id => $('#' + id).addEventListener(id === 'fQ' ? 'input' : 'change', () => { if (id === 'fInd') updateCritFilter(); renderSeg(); }));
+  $('#fClear').onclick = () => { ['fQ', 'fInd', 'fCrit', 'fHor', 'fEst', 'fVal', 'fDesde', 'fHasta'].forEach(id => $('#' + id).value = ''); updateCritFilter(); renderSeg(); };
+}
+function updateCritFilter() {
+  const ind = $('#fInd').value;
+  fillSelect($('#fCrit'), D.criterios.filter(c => !ind || c.ind === ind).map(c => ({ v: c.id, t: c.id + ' · ' + c.nombre })));
+}
+function quickFilter(f) {
+  $('#fClear').click();
+  if (f.fInd) { $('#fInd').value = f.fInd; updateCritFilter(); }
+  Object.entries(f).forEach(([k, v]) => { if (k !== 'fInd') $('#' + k).value = v; });
+  go('seg');
+}
+function estadoChip(e) { const s = ESTADOS[e] || ESTADOS.Pendiente; return `<span class="chip"><i style="background:${s.c}"></i>${esc(e)}</span>`; }
+function valChip(v) { return `<span class="chip ${VALS[v] || ''}">${v === 'Aprobado' ? '✓ ' : ''}${esc(v)}</span>`; }
+function horChip(h) { return `<span class="chip ${h === 'Quick win' ? 'qw' : ''}">${esc(h)}</span>`; }
+function renderSeg() {
+  const q = $('#fQ').value.trim().toLowerCase(), fi = $('#fInd').value, fc = $('#fCrit').value, fh = $('#fHor').value, fe = $('#fEst').value, fv = $('#fVal').value;
+  const ff = $('#fFecha').value, fd = $('#fDesde').value, fa = $('#fHasta').value;
+  const list = D.recomendaciones.filter(r => {
+    if (fi && r.indicador !== fi) return false; if (fc && r.criterio !== fc) return false;
+    if (fh && r.horizonte !== fh) return false; if (fe && r.estado !== fe) return false; if (fv && r.validacion !== fv) return false;
+    if (q && !(r.id + ' ' + r.titulo + ' ' + r.hallazgo + ' ' + r.cambio + ' ' + r.causa).toLowerCase().includes(q)) return false;
+    const d = (r[ff] || '').slice(0, 10);
+    if ((fd || fa) && !d) return false;
+    if (fd && d < fd) return false; if (fa && d > fa) return false;
+    return true;
+  });
+  const today = new Date();
+  $('#recCount').textContent = `${list.length} de ${D.recomendaciones.length} recomendaciones`;
+  $('#recTable tbody').innerHTML = list.length ? list.map(r => {
+    const late = r.estado !== 'Realizado' && r.estado !== 'No se pudo realizar' && toDate(r.fecha_limite) < today;
+    const c = critById(r.criterio);
+    return `<tr class="click" data-id="${r.id}">
+      <td data-l="ID"><b style="font-weight:600">${r.id}</b><div class="dim" style="font-size:11px">${esc(r.hallazgo)}</div></td>
+      <td class="ttl" data-l="Recomendación">${esc(r.titulo)}<div class="dim" style="font-size:11px">${esc(r.causa)} · ${esc(r.responsable)}</div></td>
+      <td data-l="Indicador">${r.indicador}<div class="dim" style="font-size:11px">${esc(c ? c.nombre : r.criterio)}</div></td>
+      <td data-l="Horizonte">${horChip(r.horizonte)}${r.semana ? `<div class="dim" style="font-size:11px">Semana ${r.semana}</div>` : ''}</td>
+      <td data-l="Límite" style="${late ? 'color:var(--s-no)' : ''}">${fDate(r.fecha_limite)}${late ? '<div style="font-size:11px">Vencida</div>' : ''}</td>
+      <td data-l="Estado">${estadoChip(r.estado)}</td>
+      <td data-l="Validación">${valChip(r.validacion)}</td>
+      <td class="num" data-l="Impacto ORI">+${fmt1(recDeltaOri(r))}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="8" class="empty">Sin recomendaciones con estos filtros.</td></tr>`;
+  document.querySelectorAll('#recTable tr.click').forEach(tr => tr.onclick = () => openRec(tr.dataset.id));
+  const pend = D.recomendaciones.filter(r => r.validacion === 'Pendiente validación').length;
+  const n = $('#nPend'); n.hidden = !(pend && USER.role === 'validador'); n.textContent = pend;
+}
+
+/* ===================== Drawer de recomendación ===================== */
+function openRec(id) {
+  const r = D.recomendaciones.find(x => x.id === id); if (!r) return;
+  const c = critById(r.criterio);
+  const hist = D.log.filter(e => e.id === id).slice().reverse();
+  const tRes = r.fecha_realizado ? hoursBetween(r.fecha_alta, r.fecha_realizado) : null;
+  const tVal = r.validacion === 'Aprobado' && r.fecha_realizado ? hoursBetween(r.fecha_realizado, r.fecha_validacion) : null;
+  const locked = r.validacion === 'Aprobado' || r.validacion === 'Cierre ratificado';
+  let act = '';
+  if (USER.role === 'zelva' && !locked) {
+    const opts = ['En curso', 'Realizado', 'Necesita apoyo', 'No se pudo realizar'];
+    act = `<div class="box"><h3>Reportar avance (Zelva)</h3>
+      <div class="opts" id="stOpts">${opts.map(o => `<button data-v="${o}" class="${r.estado === o ? 'on' : ''}"><i style="width:9px;height:9px;border-radius:50%;background:${ESTADOS[o].c};display:inline-block"></i>${o}</button>`).join('')}</div>
+      <div class="field"><span id="stHint">Comentario</span><textarea id="stCom" placeholder="Qué se hizo, qué falta o por qué no se pudo…"></textarea></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px"><span class="dim" style="font-size:11px">Se notifica a Jennifer por Slack. No mueve el ORI hasta que ella lo apruebe.</span><button class="btn pri" id="stGo">Enviar</button></div></div>`;
+  } else if (USER.role === 'validador' && r.validacion === 'Pendiente validación') {
+    const btns = r.estado === 'Realizado' ? `<button class="btn ok" data-d="aprobar">✓ Aprobar ajuste</button><button class="btn" data-d="devolver">Devolver a Zelva</button>`
+      : r.estado === 'No se pudo realizar' ? `<button class="btn" data-d="ratificar">Ratificar cierre (sin impacto en ORI)</button><button class="btn" data-d="devolver">Devolver a Zelva</button>`
+        : `<button class="btn" data-d="apoyo">Registrar apoyo</button>`;
+    act = `<div class="box" style="border-color:var(--b-func)"><h3>Validación de Jennifer</h3>
+      <p class="muted" style="font-size:12px;margin:4px 0 0">${r.estado === 'Realizado' ? `Al aprobar, el criterio ${c ? esc(c.nombre) : ''} sube +${fmt1(r.delta)} y el ORI +${fmt1(recDeltaOri(r))}.` : 'Zelva reportó: ' + esc(r.estado) + '.'}</p>
+      <div class="field">Comentario de validación<textarea id="vaCom" placeholder="Evidencia revisada, condiciones o motivo de devolución…"></textarea></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px" id="vaBtns">${btns}</div></div>`;
+  } else if (locked) {
+    act = `<div class="box" style="border-color:var(--s-ok)"><b style="color:var(--s-ok)">${r.validacion === 'Aprobado' ? '✓ Aprobado' : 'Cierre ratificado'}</b> por ${esc(r.validado_por)} · ${fDT(r.fecha_validacion)}${r.comentario_validacion ? `<div class="muted" style="font-size:12px;margin-top:4px">${esc(r.comentario_validacion)}</div>` : ''}</div>`;
+  }
+  $('#drawer').innerHTML = `
+    <button class="btn ghost x" onclick="closeRec()" aria-label="Cerrar">✕</button>
+    <p class="kicker">${r.id} · ${esc(r.hallazgo)} · ${esc(r.causa)}</p>
+    <h2 style="text-transform:none;font-size:19px;padding-right:40px">${esc(r.titulo)}</h2>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${horChip(r.horizonte)}${estadoChip(r.estado)}${valChip(r.validacion)}</div>
+    <dl class="kv">
+      <dt>Cambio sugerido</dt><dd>${esc(r.cambio)}</dd>
+      <dt>Impacto esperado</dt><dd>${esc(r.impacto)}</dd>
+      <dt>Indicador</dt><dd>${r.indicador} · ${esc(c ? c.nombre : r.criterio)} (${c ? Math.round(c.peso * 100) : '–'}%)</dd>
+      <dt>Impacto en score</dt><dd>+${fmt1(r.delta)} al criterio · +${fmt1(recDeltaOri(r))} al ORI</dd>
+      <dt>Responsable</dt><dd>${esc(r.responsable)}</dd>
+      <dt>Subida</dt><dd>${fDT(r.fecha_alta)}</dd>
+      <dt>Fecha límite</dt><dd>${fDate(r.fecha_limite)}${r.semana ? ' · semana ' + r.semana : ''}</dd>
+      <dt>Último reporte</dt><dd>${r.fecha_estado ? fDT(r.fecha_estado) : '–'}${r.comentario ? `<div class="muted" style="font-size:12px">“${esc(r.comentario)}”</div>` : ''}</dd>
+      <dt>Tiempo Zelva</dt><dd>${fDur(tRes)}${tVal != null ? ` · validación ${fDur(tVal)}` : ''}</dd>
+    </dl>
+    ${act}
+    <div class="box"><h3>Historial</h3><ul class="timeline">${hist.map(e => `<li class="${e.accion === 'Aprobado' ? 'v' : ''}"><span class="t">${fDT(e.ts)} · ${esc(e.usuario)}</span><br><b style="font-weight:500">${esc(e.accion)}</b>${e.antes || e.despues ? ` · ${esc(e.antes || '—')} → ${esc(e.despues)}` : ''}${e.comentario ? `<div class="muted">${esc(e.comentario)}</div>` : ''}</li>`).join('') || '<li>Sin movimientos</li>'}</ul></div>`;
+  $('#drawer').classList.add('on'); $('#scrim').classList.add('on'); $('#drawer').setAttribute('aria-hidden', 'false');
+  history.replaceState(null, '', '?rec=' + id);
+  // eventos
+  let st = null;
+  document.querySelectorAll('#stOpts button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#stOpts button').forEach(x => x.classList.remove('on')); b.classList.add('on'); st = b.dataset.v;
+    $('#stHint').textContent = st === 'No se pudo realizar' ? '¿Por qué no se pudo? (obligatorio)' : st === 'Necesita apoyo' ? '¿Qué apoyo necesitan? (obligatorio)' : st === 'Realizado' ? 'Qué se hizo y dónde verlo (obligatorio)' : 'Comentario (opcional)';
+  });
+  const stGo = $('#stGo');
+  if (stGo) stGo.onclick = async () => {
+    const com = $('#stCom').value.trim();
+    if (!st) return toast('Elige un estado', '');
+    if (st !== 'En curso' && !com) return toast('Falta el comentario', 'Explica qué se hizo o por qué.');
+    await act_('estado', { id, estado: st, comentario: com }, `Estado actualizado: ${st}`);
+  };
+  document.querySelectorAll('#vaBtns button').forEach(b => b.onclick = async () => {
+    const com = $('#vaCom').value.trim();
+    if (b.dataset.d !== 'aprobar' && !com) return toast('Falta el comentario', 'Explica la decisión para la trazabilidad.');
+    await act_('validar', { id, decision: b.dataset.d, comentario: com }, b.dataset.d === 'aprobar' ? 'Ajuste aprobado · el ORI se recalculó' : 'Validación registrada');
+  });
+}
+async function act_(action, payload, okMsg) {
+  try {
+    const j = await api(action, payload);
+    if (!DEMO) await loadData();
+    toast(okMsg, '');
+    if (j.slack) toast(j.slack.simulated ? 'Slack (simulado) → @Jennifer' : 'Slack enviado a Jennifer', j.slack.text || '');
+    renderAll();
+    if (payload.id || (j.rec && j.rec.id)) openRec(payload.id || j.rec.id);
+  } catch (e) { toast('No se pudo guardar', e.message); }
+}
+function closeRec() { $('#drawer').classList.remove('on'); $('#scrim').classList.remove('on'); $('#drawer').setAttribute('aria-hidden', 'true'); history.replaceState(null, '', location.pathname); }
+$('#scrim').onclick = closeRec;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRec(); });
+
+function openAdd() {
+  const indOpts = D.indicadores.map(i => `<option value="${i.id}">${i.id} · ${esc(i.corto)}</option>`).join('');
+  $('#drawer').innerHTML = `<button class="btn ghost x" onclick="closeRec()">✕</button>
+    <p class="kicker">Rebold · nuevo hallazgo</p><h2>Nueva recomendación</h2>
+    <p class="muted" style="font-size:12px">Se registra con la fecha y hora de subida; desde ese momento corre el tiempo de resolución de Zelva.</p>
+    <div class="field">Título<input id="nTit"></div>
+    <div class="field">Cambio sugerido<textarea id="nCam"></textarea></div>
+    <div class="field">Impacto esperado en el negocio<input id="nImp"></div>
+    <div class="opts" style="grid-template-columns:1fr 1fr">
+      <div class="field">Indicador<select id="nInd">${indOpts}</select></div>
+      <div class="field">Criterio<select id="nCrit"></select></div>
+      <div class="field">Horizonte<select id="nHor">${HORS.map(h => `<option>${h}</option>`).join('')}</select></div>
+      <div class="field">Fecha límite<input type="date" id="nLim"></div>
+      <div class="field">Hallazgo (ej. H3)<input id="nHal" value="—"></div>
+      <div class="field">Causa<select id="nCau"><option>Medición</option><option>Estructura de marca</option><option>Gobierno y objetivos</option><option>Otra</option></select></div>
+      <div class="field">Responsable<input id="nRes" value="Zelva"></div>
+      <div class="field">Impacto en score (0–10)<input id="nDel" type="number" step="0.1" min="0" max="5" value="1"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn pri" id="nGo">Registrar</button></div>`;
+  const syncCrit = () => $('#nCrit').innerHTML = D.criterios.filter(c => c.ind === $('#nInd').value).map(c => `<option value="${c.id}">${c.id} · ${esc(c.nombre)}</option>`).join('');
+  $('#nInd').onchange = syncCrit; syncCrit();
+  $('#drawer').classList.add('on'); $('#scrim').classList.add('on');
+  $('#nGo').onclick = async () => {
+    const rec = { titulo: $('#nTit').value.trim(), cambio: $('#nCam').value.trim(), impacto: $('#nImp').value.trim(), indicador: $('#nInd').value, criterio: $('#nCrit').value, horizonte: $('#nHor').value, fecha_limite: $('#nLim').value, hallazgo: $('#nHal').value.trim() || '—', causa: $('#nCau').value, responsable: $('#nRes').value.trim(), delta: Math.max(0, Math.min(5, +$('#nDel').value || 0)), semana: 0 };
+    if (!rec.titulo || !rec.fecha_limite) return toast('Faltan datos', 'Título y fecha límite son obligatorios.');
+    await act_('alta', { rec }, 'Recomendación registrada');
+  };
+}
+$('#btnAdd').onclick = openAdd;
+
+/* ===================== Render: Eficiencia ===================== */
+function efiRows(groupKey, groups) {
+  const today = new Date();
+  return groups.map(g => {
+    const rs = D.recomendaciones.filter(r => r[groupKey] === g);
+    const done = rs.filter(r => r.fecha_realizado);
+    const ap = rs.filter(r => r.validacion === 'Aprobado');
+    const tRes = avg(done.map(r => hoursBetween(r.fecha_alta, r.fecha_realizado)));
+    const tVal = avg(ap.filter(r => r.fecha_realizado).map(r => hoursBetween(r.fecha_realizado, r.fecha_validacion)));
+    const onTime = done.length ? done.filter(r => toDate(r.fecha_realizado) <= toDate(r.fecha_limite)).length / done.length : null;
+    const late = rs.filter(r => !r.fecha_realizado && r.estado !== 'No se pudo realizar' && toDate(r.fecha_limite) < today).length;
+    return { g, n: rs.length, done: done.length, ap: ap.length, tRes, tVal, onTime, late };
+  });
+}
+function efiTable(rows, label) {
+  return `<table class="tbl mt"><thead><tr><th>${label}</th><th class="num">Total</th><th>Aprobadas</th><th class="num">Resolución Zelva</th><th class="num">Validación</th><th class="num">A tiempo</th><th class="num">Vencidas</th></tr></thead><tbody>${rows.map(x => `<tr>
+    <td>${esc(x.g)}</td><td class="num">${x.n}</td>
+    <td><div class="hbarc"><div class="t"><span style="width:${x.n ? x.ap / x.n * 100 : 0}%;background:var(--s-ok)"></span></div><span class="num">${x.ap}</span></div></td>
+    <td class="num">${fDur(x.tRes)}</td><td class="num">${fDur(x.tVal)}</td>
+    <td class="num">${x.onTime == null ? '–' : Math.round(x.onTime * 100) + '%'}</td>
+    <td class="num" style="${x.late ? 'color:var(--s-no)' : ''}">${x.late}</td></tr>`).join('')}</tbody></table>`;
+}
+function renderEfi() {
+  const R = D.recomendaciones, today = new Date();
+  const done = R.filter(r => r.fecha_realizado);
+  const ap = R.filter(r => r.validacion === 'Aprobado' && r.fecha_realizado);
+  const tRes = avg(done.map(r => hoursBetween(r.fecha_alta, r.fecha_realizado)));
+  const tVal = avg(ap.map(r => hoursBetween(r.fecha_realizado, r.fecha_validacion)));
+  const tCyc = avg(ap.map(r => hoursBetween(r.fecha_alta, r.fecha_validacion)));
+  const onTime = done.length ? done.filter(r => toDate(r.fecha_realizado) <= toDate(r.fecha_limite)).length / done.length : null;
+  $('#efiKpis').innerHTML = `
+    <div class="card kpi"><div class="l">Resolución promedio de Zelva</div><div class="v">${fDur(tRes)}</div><div class="s">Desde la subida del hallazgo hasta “Realizado” · ${done.length} casos</div></div>
+    <div class="card kpi"><div class="l">Validación promedio de Jennifer</div><div class="v">${fDur(tVal)}</div><div class="s">Desde “Realizado” hasta la aprobación · ${ap.length} casos</div></div>
+    <div class="card kpi"><div class="l">Ciclo completo</div><div class="v">${fDur(tCyc)}</div><div class="s">De la subida a la aprobación</div></div>
+    <div class="card kpi"><div class="l">Cumplimiento de fecha límite</div><div class="v">${onTime == null ? '–' : Math.round(onTime * 100) + '%'}</div><div class="s">De lo realizado, cerrado antes del límite</div></div>`;
+  $('#efiInd').innerHTML = efiTable(efiRows('indicador', D.indicadores.map(i => i.id)), 'Indicador');
+  $('#efiHor').innerHTML = efiTable(efiRows('horizonte', HORS), 'Horizonte');
+  const risk = R.filter(r => !r.fecha_realizado && r.estado !== 'No se pudo realizar' && r.horizonte !== 'Largo plazo' && (toDate(r.fecha_limite) - today) / 864e5 < 3)
+    .sort((a, b) => a.fecha_limite.localeCompare(b.fecha_limite));
+  $('#efiLate').innerHTML = risk.length ? `<table class="tbl mt"><thead><tr><th>ID</th><th>Recomendación</th><th>Límite</th><th>Estado</th><th class="num">Días</th></tr></thead><tbody>${risk.map(r => {
+    const d = Math.ceil((toDate(r.fecha_limite) - today) / 864e5);
+    return `<tr class="click" onclick="openRec('${r.id}')"><td>${r.id}</td><td>${esc(r.titulo)}</td><td>${fDate(r.fecha_limite)}</td><td>${estadoChip(r.estado)}</td><td class="num" style="color:${d < 0 ? 'var(--s-no)' : 'var(--b-func)'}">${d < 0 ? d + ' (vencida)' : 'faltan ' + d}</td></tr>`;
+  }).join('')}</tbody></table>` : '<div class="empty">Nada vencido ni por vencer en los próximos 3 días.</div>';
+}
+
+/* ===================== Render: Bitácora ===================== */
+function setupLogFilters() {
+  fillSelect($('#lAcc'), [...new Set(D.log.map(e => e.accion))], 'Todas');
+  fillSelect($('#lRol'), [...new Set(D.log.map(e => e.rol))], 'Todos');
+}
+function renderLog() {
+  setupLogFilters();
+  const q = $('#lQ').value.trim().toLowerCase(), a = $('#lAcc').value, ro = $('#lRol').value;
+  const rows = D.log.filter(e => (!a || e.accion === a) && (!ro || e.rol === ro) && (!q || (e.id + ' ' + e.usuario + ' ' + e.comentario + ' ' + e.accion).toLowerCase().includes(q))).slice().reverse();
+  $('#logTable tbody').innerHTML = rows.map(e => `<tr class="click" onclick="openRec('${e.id}')"><td class="num" style="text-align:left">${fDT(e.ts)}</td><td>${e.id}</td><td>${esc(e.accion)}</td><td>${esc(e.antes || '—')} → ${esc(e.despues)}</td><td>${esc(e.usuario)}<div class="dim" style="font-size:11px">${esc(e.rol)}</div></td><td class="muted" style="max-width:340px">${esc(e.comentario)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Sin registros</td></tr>';
+}
+['lQ', 'lAcc', 'lRol'].forEach(id => $('#' + id).addEventListener(id === 'lQ' ? 'input' : 'change', renderLog));
+function csv(rows, name) {
+  const keys = Object.keys(rows[0] || {});
+  const s = [keys.join(';')].concat(rows.map(r => keys.map(k => '"' + String(r[k] ?? '').replace(/"/g, '""') + '"').join(';'))).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + s], { type: 'text/csv' })); a.download = name; a.click();
+}
+$('#btnExportLog').onclick = () => csv(D.log, 'D1_bitacora.csv');
+$('#btnExportEfi').onclick = () => csv(D.recomendaciones.map(r => ({ ...r, horas_resolucion: r.fecha_realizado ? Math.round(hoursBetween(r.fecha_alta, r.fecha_realizado) * 10) / 10 : '', horas_validacion: r.validacion === 'Aprobado' && r.fecha_realizado ? Math.round(hoursBetween(r.fecha_realizado, r.fecha_validacion) * 10) / 10 : '' })), 'D1_eficiencia.csv');
+
+/* ===================== Render: Rúbrica ===================== */
+function renderRub() {
+  const S = scores();
+  $('#rubSeg').innerHTML = D.indicadores.map(i => `<button data-id="${i.id}" class="${i.id === rubInd ? 'on' : ''}">${i.id}</button>`).join('');
+  document.querySelectorAll('#rubSeg button').forEach(b => b.onclick = () => { rubInd = b.dataset.id; renderRub(); });
+  const i = indById(rubInd);
+  $('#rubList').innerHTML = `<p class="muted" style="margin:0 0 10px">${esc(i.nombre)} · ${esc(i.mide)}</p>` + D.criterios.filter(c => c.ind === rubInd).map(c => {
+    const s = S.crit[c.id];
+    const band = s == null ? -1 : s < 2.5 ? 0 : s < 4.5 ? 1 : s < 6.5 ? 2 : s < 8.5 ? 3 : 4;
+    const rub = D.rubrica[c.id] || [];
+    return `<div class="card mt"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><h3>${c.id} · ${esc(c.nombre)}</h3><div class="muted" style="font-size:12px">${esc(c.evalua)}</div></div><div style="text-align:right"><span class="chip">Peso ${Math.round(c.peso * 100)}%</span> <span class="chip">Hoy ${fmt1(s)} / 10</span></div></div>
+      <div class="rub">${RUB_BANDS.map((b, k) => `<div class="${k === band ? 'cur' : ''}"><b>${b}</b>${esc(rub[k] || '')}</div>`).join('')}</div></div>`;
+  }).join('');
+}
+
+/* ===================== Navegación, sesión, toasts ===================== */
+function go(v) {
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  document.querySelectorAll('section.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
+  renderAll(); scrollTo({ top: 0 });
+}
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => go(b.dataset.v));
+function toast(t, s) {
+  const el = document.createElement('div'); el.className = 'toast'; el.innerHTML = `<b>${esc(t)}</b>${esc(s || '')}`;
+  $('#toasts').appendChild(el); setTimeout(() => el.remove(), 5200);
+}
+function renderWho() {
+  if (DEMO) {
+    $('#whoBox').innerHTML = `<span>Ver como</span><select id="roleSel">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${USER.role === k ? 'selected' : ''}>${v}</option>`).join('')}</select><button class="btn ghost" id="resetDemo" title="Volver a los datos ficticios iniciales" style="padding:5px 9px;font-size:12px">Reiniciar demo</button>`;
+    $('#roleSel').onchange = e => { USER.role = e.target.value; USER.name = { zelva: 'Equipo Zelva', rebold: 'Rebold', validador: CONFIG.VALIDADORA, lectura: '' }[USER.role]; saveUser(); renderAll(); closeRec(); };
+    $('#resetDemo').onclick = () => { try { localStorage.removeItem(LS.demo); } catch (e) { } loadData().then(() => { renderAll(); toast('Demo reiniciada', 'Datos ficticios originales'); }); };
+  } else {
+    $('#whoBox').innerHTML = `<span>${esc(USER.name)} · ${esc(ROLES[USER.role] || USER.role)}</span><button class="btn ghost" id="logout" style="padding:5px 9px;font-size:12px">Salir</button>`;
+    $('#logout').onclick = () => { try { localStorage.removeItem(LS.user); } catch (e) { } location.reload(); };
+  }
+}
+function saveUser() { try { localStorage.setItem(LS.user, JSON.stringify(USER)); } catch (e) { } }
+function renderAll() {
+  renderWho();
+  $('#btnAdd').hidden = !(USER.role === 'rebold' || USER.role === 'validador');
+  const on = (document.querySelector('section.view.on') || {}).id;
+  if (on === 'v-ori') renderOri();
+  if (on === 'v-ind') renderInd();
+  if (on === 'v-seg') renderSeg();
+  if (on === 'v-efi') renderEfi();
+  if (on === 'v-log') renderLog();
+  if (on === 'v-rub') renderRub();
+  renderSeg(); // mantiene el contador de pendientes
+  $('#footSrc').textContent = DEMO ? 'Modo demo: datos ficticios guardados solo en este navegador.' : 'Fuente: Google Sheet D1_Rebold_Audit_Seguimiento.';
+}
+
+async function boot() {
+  try { const u = JSON.parse(localStorage.getItem(LS.user) || 'null'); if (u) USER = u; } catch (e) { }
+  if (DEMO) {
+    if (!USER.role || USER.role === 'lectura') { USER.role = 'zelva'; USER.name = 'Equipo Zelva'; }
+  } else {
+    $('#modePill').className = 'pill live'; $('#modePill').textContent = 'EN VIVO · Google Sheets';
+    if (!USER.code) { await askLogin(); }
+  }
+  try { await loadData(); }
+  catch (e) { if (!DEMO) { try { localStorage.removeItem(LS.user); } catch (x) { } USER.code = ''; await askLogin(e.message); return boot(); } }
+  setupFilters();
+  renderAll();
+  const p = new URLSearchParams(location.search);
+  if (p.get('rec')) { go('seg'); openRec(p.get('rec')); }
+}
+function askLogin(err) {
+  return new Promise(res => {
+    $('#login').classList.add('on'); $('#lgErr').textContent = err || '';
+    $('#lgName').value = USER.name || '';
+    $('#lgGo').onclick = () => {
+      const n = $('#lgName').value.trim(), c = $('#lgCode').value.trim();
+      if (!n || !c) { $('#lgErr').textContent = 'Nombre y código son obligatorios'; return; }
+      USER = { name: n, code: c, role: 'lectura' }; saveUser(); $('#login').classList.remove('on'); res();
+    };
+  });
+}
+boot();
+</script>
+</body>
+</html>
