@@ -1,61 +1,66 @@
 # D1 · Rebold Audit — Cuadro de mando
 
-Cuadro de control del primer **Rebold Audit**: Zelva reporta cada ajuste recomendado por la auditoría, Jennifer (Rebold) lo valida, y solo entonces se mueve el **ORI** (Optimization Readiness Index).
+Cuadro de control del primer **Rebold Audit**: Zelva reporta cada ajuste que pide la auditoría, Rebold lo valida, y solo entonces se mueve el **ORI** (Optimization Readiness Index).
 
-> **Estado actual: DEMO con datos ficticios.** Mientras `BACKEND_URL` esté vacío en `index.html`, el dashboard usa `demo-data.js` y guarda los cambios solo en el navegador. Las notificaciones de Slack se simulan.
+Publicado en https://sebastianromero-rebold.github.io/AuditoriaD1/
+
+## Modos
+
+| Modo | Cuándo | Qué hace |
+|---|---|---|
+| **Oficial · solo lectura** | `CONFIG.BACKEND_URL` vacío en `index.html` | Muestra el corte oficial del Google Sheet guardado en `data.js` (fecha del corte en el encabezado). No permite reportar ni validar. |
+| **Oficial · en vivo** | `CONFIG.BACKEND_URL` con la URL `/exec` del Apps Script | Lee el Google Sheet en cada carga, pide nombre y código de acceso, y habilita el flujo Zelva → Rebold con Slack y log. |
 
 ## Qué muestra (de lo macro a lo micro)
 
 | Pestaña | Contenido |
 |---|---|
-| 1 · ORI | ORI validado hoy, banda de lectura, línea base de la auditoría, potencial si se aprueba lo pendiente y la ruta de 6 semanas (estimada vs. validada). |
-| 2 · Indicadores y criterios | AES, CES, UXCS y AIS; cada uno abierto en sus criterios con peso, score 0–10, porcentaje y aporte al indicador. |
-| 3 · Seguimiento | Recomendaciones filtrables por indicador, criterio, horizonte (quick win, mediano, largo plazo), estado, validación y rango de fechas. Zelva reporta el estado y el porqué; Jennifer aprueba o devuelve. |
-| 4 · Eficiencia | Tiempo de resolución de Zelva (desde la subida del hallazgo, con fecha y hora), tiempo de validación, ciclo completo, cumplimiento de fecha límite y vencidas. Exporta a CSV. |
-| 5 · Bitácora | Cada alta, cambio de estado y validación con fecha, hora y usuario. Exporta a CSV. |
+| 1 · ORI | ORI validado, banda de lectura, línea base de la auditoría, potencial si se aprueba lo pendiente y la ruta semana a semana si cada hallazgo se aprueba en su fecha límite. |
+| 2 · Indicadores y criterios | AES, CES, UXCS y AIS; cada uno abierto en sus criterios con peso, score 0–10, porcentaje, aporte al indicador y la evidencia cargada en `Mediciones_Mensuales`. |
+| 3 · Seguimiento | Los hallazgos de `Alertas_QuickWins_Acciones`, filtrables por tipo, prioridad, responsable, indicador, criterio, horizonte, estado, validación y rango de fechas. |
+| 4 · Eficiencia | Tiempo de resolución de Zelva (desde la detección), tiempo de validación de Rebold, ciclo completo, cumplimiento de fecha límite y vencidas, por indicador, horizonte y responsable. Exporta CSV. |
+| 5 · Bitácora | Cada alta, cambio de estado y validación con fecha, hora y usuario. Exporta CSV. |
 | 6 · Rúbrica | Consulta de la rúbrica 0–10 por criterio, con la banda actual de D1 resaltada. |
 
 ## Regla del ORI
 
 ```
-score criterio = línea base (último mes de Mediciones_Mensuales) + Σ delta de los ajustes APROBADOS por Jennifer
+score criterio = línea base (último mes de Mediciones_Mensuales) + Σ delta de los hallazgos APROBADOS por Rebold
 indicador     = Σ (peso del criterio × score) × 10        ← promedio ponderado con los pesos de la hoja Criterios
 ORI           = promedio de AES, CES, UXCS y AIS (25% c/u)
 ```
 
-- Lo que Zelva marca como *Realizado* queda en **Pendiente validación** y no mueve el ORI. El dashboard lo muestra aparte como *potencial*.
-- Al aprobar, el `delta` de la recomendación (en puntos 0–10 del criterio) se suma al criterio.
-- Los `delta` del plan están calibrados para que, si se aprueba todo en orden, el ORI recorra la ruta estimada por la auditoría: 47 → 48 → 50 → 53 → 57 → 60 → 63.
+- Línea base oficial (sep-2026): AES 35,5 · CES 44,0 · UXCS 40,0 · AIS 30,5 → **ORI 37,5 (Crítico)**.
+- `delta` por defecto: Alta 1,0 · Media 0,5 · Baja 0,3 puntos sobre el criterio; 0 si el hallazgo está descartado o es "PENDIENTE POR AUDITAR". Si se aprueba todo lo abierto, el ORI llega a ~56,8.
+- Lo que Zelva marca como *Realizado* queda en **Pendiente validación** y no mueve el ORI; se ve aparte como *potencial*.
 - Cuando operaciones carga una medición mensual nueva, esa medición pasa a ser la línea base y solo cuentan las aprobaciones posteriores.
 
-## Flujo
+## Flujo en vivo
 
-1. **Rebold** sube la recomendación → queda la fecha y hora de alta.
-2. **Zelva** la marca: *En curso*, *Realizado*, *Necesita apoyo* o *No se pudo realizar* (las tres últimas exigen comentario con el porqué).
-3. Cada cambio **notifica a Jennifer por Slack** con el enlace directo a la recomendación.
-4. **Jennifer** aprueba (mueve el ORI), devuelve a Zelva, ratifica un cierre no realizable o registra el apoyo.
-5. Todo queda en **Log_Cambios** y en un **Google Sheet de respaldo** independiente, con una copia completa (snapshot JSON) de la recomendación en cada registro.
+1. Operaciones o Rebold registran el hallazgo en `Alertas_QuickWins_Acciones` (o Rebold lo sube desde el dashboard). El script le asigna un ID (`S01`, `S02`…) en la columna L y crea su fila en la hoja `Seguimiento` con criterio, horizonte y delta (editables en esa hoja).
+2. **Zelva** lo marca: *En curso*, *Realizado*, *Necesita apoyo* o *No se pudo realizar* (las tres últimas exigen el porqué).
+3. Cada cambio **notifica a Rebold por Slack** con el enlace directo al hallazgo.
+4. **Rebold** aprueba (mueve el ORI), devuelve a Zelva, ratifica un cierre no realizable o registra el apoyo.
+5. La columna *Estado* de `Alertas_QuickWins_Acciones` se actualiza sola (Pendiente / En curso / Completado / Descartado), así `Resumen_ORI` sigue contando bien.
+6. Todo queda en `Log_Cambios` y en el Google Sheet de respaldo `D1_Rebold_Audit_Log_Respaldo`, con una copia completa del registro en cada movimiento.
 
-## Puesta en producción
+## Encender el modo en vivo
 
-1. **Apps Script.** En el Google Sheet `D1_Rebold_Audit_Seguimiento`: *Extensiones → Apps Script*. Pegar `apps-script/Code.gs` y crear un archivo `Seed.gs` con `apps-script/Seed.gs`.
-2. **Propiedades del script** (*Configuración del proyecto*): `ZELVA_CODE`, `REBOLD_CODE`, `VALIDADOR_CODE` (Jennifer), opcional `LECTURA_CODE`; `SLACK_BOT_TOKEN` (bot con `chat:write`; sirve el mismo bot de NewBusiness) o `SLACK_WEBHOOK_URL`; `DASHBOARD_URL`. `SLACK_JENNIFER_ID` es `U0BL3EA7KNF` por defecto. Los códigos nunca van en el repositorio.
-3. Ejecutar `setup()` una vez: crea las hojas `Recomendaciones` y `Log_Cambios` y el Sheet de respaldo `D1_Rebold_Audit_Log_Respaldo`.
-4. Ejecutar `seedRecomendaciones()` una vez: carga las 36 recomendaciones del plan de 6 semanas (incluye 5 de largo plazo por validar).
-5. **Implementar → Nueva implementación → Aplicación web**: ejecutar como *yo*, acceso *cualquier persona*. Copiar la URL `/exec` en `CONFIG.BACKEND_URL` de `index.html`.
-6. Cargar en `Mediciones_Mensuales` los 21 scores oficiales de la auditoría (mes `2026-09`). Esa es la línea base del ORI en vivo.
+1. En el Google Sheet: *Extensiones → Apps Script*. Pegar `apps-script/Code.gs` y crear `Seed.gs` con `apps-script/Seed.gs`.
+2. *Configuración del proyecto → Propiedades del script*: `ZELVA_CODE`, `REBOLD_CODE`, opcional `LECTURA_CODE`; `SLACK_BOT_TOKEN` (bot con `chat:write`) y `SLACK_REBOLD_ID` (usuario U… o canal C…), o `SLACK_WEBHOOK_URL`; `DASHBOARD_URL` = `https://sebastianromero-rebold.github.io/AuditoriaD1/`. Los códigos nunca van en el repositorio.
+3. Ejecutar `setup()` una vez (autoriza permisos): crea `Seguimiento`, `Log_Cambios`, la columna `ID_Seguimiento` y el Sheet de respaldo, y registra los hallazgos actuales. Opcional: `probarSlack()`.
+4. *Implementar → Nueva implementación → Aplicación web*: ejecutar como *yo*, acceso *cualquier persona*. Pegar la URL `/exec` en `CONFIG.BACKEND_URL` de `index.html` y publicar.
 
-### Pendientes del Sheet
+## Pendientes del Sheet
 
-- `Resumen_ORI` todavía usa `AVERAGEIFS` (promedio simple). Con los pesos desiguales de `Criterios` debe ser ponderado; el dashboard ya calcula ponderado. Fórmula sugerida para AES (fila 2), igual para los demás indicadores:
+- `Mediciones_Mensuales` conserva la fila de ejemplo de UXCS-5 (30 sep, "Nombre responsable"). No afecta el cálculo (se toma la carga más reciente), pero conviene borrarla.
+- `Resumen_ORI` usa `AVERAGEIFS` (promedio simple → 37,3); el dashboard usa promedio ponderado (37,5). Fórmula ponderada sugerida para AES (fila 2), igual para los demás:
   ```
   =IFERROR(ROUND(SUMPRODUCT((Mediciones_Mensuales!$A$3:$A$400=$A2)*(Mediciones_Mensuales!$C$3:$C$400="AES")*Mediciones_Mensuales!$F$3:$F$400*IFERROR(VLOOKUP(Mediciones_Mensuales!$D$3:$D$400,Criterios!$A:$E,5,0),0))/SUMPRODUCT((Mediciones_Mensuales!$A$3:$A$400=$A2)*(Mediciones_Mensuales!$C$3:$C$400="AES")*IFERROR(VLOOKUP(Mediciones_Mensuales!$D$3:$D$400,Criterios!$A:$E,5,0),0))*10,1),"")
   ```
-- La línea base de la demo (AES 41 · CES 54 · UXCS 50 · AIS 43) es la reconstrucción provisional del deck. Reemplazar por los puntajes oficiales.
 
 ## Archivos
 
 - `index.html`: el dashboard completo (HTML/CSS/JS sin dependencias).
-- `demo-data.js`: datos ficticios de la demo.
-- `apps-script/Code.gs`, `apps-script/Seed.gs`: backend en Google Apps Script.
-- `logo_white.png`: logo de Rebold.
+- `data.js`: corte oficial del Google Sheet para el modo solo lectura.
+- `apps-script/Code.gs`, `apps-script/Seed.gs`: backend en Google Apps Script y clasificación inicial (criterio, horizonte, delta) de los 63 hallazgos.
