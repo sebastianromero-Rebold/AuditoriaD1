@@ -18,7 +18,7 @@
  *   DASHBOARD_URL      https://sebastianromero-rebold.github.io/AuditoriaD1/
  *   LOG_BACKUP_ID      lo crea setup()
  */
-var VERSION = '2.0.0';
+var VERSION = '2.0.1';
 var SHEET_ID = '1mUT5FFzteufgbQ1owWbaIWVq-5g4l5Sc79xcF_JAT80';
 var SH_ALERTAS = 'Alertas_QuickWins_Acciones';
 var SH_SEG = 'Seguimiento';
@@ -136,10 +136,26 @@ function doPost(e) {
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 function auth_(code) {
   var p = PropertiesService.getScriptProperties();
-  code = String(code || '');
-  var map = { zelva: 'ZELVA_CODE', rebold: 'REBOLD_CODE', lectura: 'LECTURA_CODE' };
-  for (var role in map) { var c = p.getProperty(map[role]); if (c && code === c) return { role: role }; }
+  code = String(code || '').trim();
+  if (!code) throw new Error('Falta el código de acceso (parámetro code)');
+  var map = { zelva: 'ZELVA_CODE', rebold: 'REBOLD_CODE', lectura: 'LECTURA_CODE' }, hay = 0;
+  for (var role in map) {
+    var c = String(p.getProperty(map[role]) || '').trim();
+    if (c) hay++;
+    if (c && code === c) return { role: role };
+  }
+  if (!hay) throw new Error('El script no tiene códigos configurados (ZELVA_CODE / REBOLD_CODE en Propiedades del script)');
   throw new Error('Código de acceso inválido');
+}
+/** Diagnóstico: muestra qué propiedades existen y su largo, sin revelar los valores. */
+function revisarConfiguracion() {
+  var p = PropertiesService.getScriptProperties().getProperties();
+  ['ZELVA_CODE', 'REBOLD_CODE', 'LECTURA_CODE', 'SLACK_BOT_TOKEN', 'SLACK_REBOLD_ID', 'SLACK_WEBHOOK_URL', 'DASHBOARD_URL', 'LOG_BACKUP_ID'].forEach(function (k) {
+    var v = p[k];
+    Logger.log(k + ': ' + (v ? 'OK (' + v.length + ' caracteres' + (v !== v.trim() ? ', TIENE ESPACIOS AL INICIO O FINAL' : '') + ')' : 'NO EXISTE'));
+  });
+  Object.keys(p).filter(function (k) { return !/^(ZELVA_CODE|REBOLD_CODE|LECTURA_CODE|SLACK_BOT_TOKEN|SLACK_REBOLD_ID|SLACK_WEBHOOK_URL|DASHBOARD_URL|LOG_BACKUP_ID)$/.test(k); })
+    .forEach(function (k) { Logger.log('Propiedad con otro nombre (¿mal escrita?): "' + k + '"'); });
 }
 
 /* ---------------- Acciones ---------------- */
