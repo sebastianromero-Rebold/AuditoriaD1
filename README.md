@@ -26,12 +26,13 @@ Publicado en https://sebastianromero-rebold.github.io/AuditoriaD1/
 
 ```
 score criterio = línea base (último mes de Mediciones_Mensuales) + Σ delta de los hallazgos APROBADOS por Rebold
-indicador     = Σ (peso del criterio × score) × 10        ← promedio ponderado con los pesos de la hoja Criterios
+indicador     = promedio simple de sus criterios × 10, redondeado a 1 decimal   ← igual que la hoja Resumen_ORI
 ORI           = promedio de AES, CES, UXCS y AIS (25% c/u)
 ```
 
-- Línea base oficial (sep-2026): AES 35,5 · CES 44,0 · UXCS 40,0 · AIS 30,5 → **ORI 37,5 (Crítico)**.
-- `delta` por defecto: Alta 1,0 · Media 0,5 · Baja 0,3 puntos sobre el criterio; 0 si el hallazgo está descartado o es "PENDIENTE POR AUDITAR". Si se aprueba todo lo abierto, el ORI llega a ~56,8.
+- Línea base oficial (sep-2026): AES 35 · CES 44 · UXCS 40 · AIS 30 → **ORI 37,3 (Crítico)**, la misma cifra de `Resumen_ORI`, el plan y el deck.
+- `CONFIG.METODO` en `index.html` permite pasar a `'ponderado'` (pesos de la hoja `Criterios`, ORI 37,5). Si se cambia, hay que cambiar también `Resumen_ORI` y el deck para que sigan coincidiendo.
+- `delta` por defecto: Alta 1,0 · Media 0,5 · Baja 0,3 puntos sobre el criterio; 0 si el hallazgo está descartado o es "PENDIENTE POR AUDITAR". 
 - Lo que Zelva marca como *Realizado* queda en **Pendiente validación** y no mueve el ORI; se ve aparte como *potencial*.
 - Cuando operaciones carga una medición mensual nueva, esa medición pasa a ser la línea base y solo cuentan las aprobaciones posteriores.
 
@@ -51,10 +52,18 @@ ORI           = promedio de AES, CES, UXCS y AIS (25% c/u)
 3. Ejecutar `setup()` una vez (autoriza permisos): crea `Seguimiento`, `Log_Cambios`, la columna `ID_Seguimiento` y el Sheet de respaldo, y registra los hallazgos actuales. Opcional: `probarSlack()`.
 4. *Implementar → Nueva implementación → Aplicación web*: ejecutar como *yo*, acceso *cualquier persona*. Pegar la URL `/exec` en `CONFIG.BACKEND_URL` de `index.html` y publicar.
 
+## Hallazgos cargados directo en el Sheet
+
+Al agregar filas en `Alertas_QuickWins_Acciones` hay dos caminos y los dos sirven:
+- Solo agregar la fila en `Alertas`: el script le asigna el ID siguiente y crea su fila en `Seguimiento` con criterio vacío, horizonte por fecha y delta por prioridad. Luego se completa el criterio en `Seguimiento`.
+- Agregar también la fila en `Seguimiento` con el ID siguiente (S79, S80…) y su criterio, horizonte y delta: el script solo escribe el ID en la columna L de `Alertas` y respeta lo cargado.
+
+`limpiarDuplicadosSeguimiento()` borra filas repetidas de un mismo ID en `Seguimiento`, conservando la primera, y solo si la repetida nunca tuvo movimiento.
+
 ## Pendientes del Sheet
 
 - `Mediciones_Mensuales` conserva la fila de ejemplo de UXCS-5 (30 sep, "Nombre responsable"). No afecta el cálculo (se toma la carga más reciente), pero conviene borrarla.
-- `Resumen_ORI` usa `AVERAGEIFS` (promedio simple → 37,3); el dashboard usa promedio ponderado (37,5). Fórmula ponderada sugerida para AES (fila 2), igual para los demás:
+- Si algún día se pasa a ponderado, la fórmula sugerida para AES en `Resumen_ORI` (fila 2), igual para los demás, es:
   ```
   =IFERROR(ROUND(SUMPRODUCT((Mediciones_Mensuales!$A$3:$A$400=$A2)*(Mediciones_Mensuales!$C$3:$C$400="AES")*Mediciones_Mensuales!$F$3:$F$400*IFERROR(VLOOKUP(Mediciones_Mensuales!$D$3:$D$400,Criterios!$A:$E,5,0),0))/SUMPRODUCT((Mediciones_Mensuales!$A$3:$A$400=$A2)*(Mediciones_Mensuales!$C$3:$C$400="AES")*IFERROR(VLOOKUP(Mediciones_Mensuales!$D$3:$D$400,Criterios!$A:$E,5,0),0))*10,1),"")
   ```

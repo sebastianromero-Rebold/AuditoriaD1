@@ -18,7 +18,7 @@
  *   DASHBOARD_URL      https://sebastianromero-rebold.github.io/AuditoriaD1/
  *   LOG_BACKUP_ID      lo crea setup()
  */
-var VERSION = '2.0.1';
+var VERSION = '2.0.2';
 var SHEET_ID = '1mUT5FFzteufgbQ1owWbaIWVq-5g4l5Sc79xcF_JAT80';
 var SH_ALERTAS = 'Alertas_QuickWins_Acciones';
 var SH_SEG = 'Seguimiento';
@@ -75,10 +75,14 @@ function sync_() {
     vals = al.getRange(2, 1, last - 1, COL_ID).getValues();
     var max = vals.reduce(function (m, r) { return Math.max(m, parseInt(String(r[COL_ID - 1]).slice(1), 10) || 0); }, 0);
     var n = 0, ts = now_();
+    // IDs que ya tienen fila en Seguimiento (p. ej. cargadas a mano con criterio, horizonte y delta).
+    var enSeg = {};
+    if (seg.getLastRow() > 1) seg.getRange(2, 1, seg.getLastRow() - 1, 1).getValues().forEach(function (v) { if (v[0]) enSeg[String(v[0]).trim()] = true; });
     vals.forEach(function (r, i) {
       if (!r[0] || r[COL_ID - 1]) return;
       var id = 'S' + ('0' + (++max)).slice(-2);
       al.getRange(i + 2, COL_ID).setValue(id);
+      if (enSeg[id]) return; // ya registrada: solo se enlaza el ID, sin duplicar ni pisar lo cargado
       var seed = (typeof SEED_CLASIFICACION !== 'undefined' && SEED_CLASIFICACION[id]) || {};
       var estado = { 'En curso': 'En curso', 'Descartado': 'Descartado', 'Completado': 'Realizado' }[String(r[10])] || 'Pendiente';
       var prio = String(r[4]), desc = String(r[5]);
@@ -263,7 +267,13 @@ function readAll_() {
     });
   // Hallazgos = Alertas (descripción) + Seguimiento (estado)
   var seg = {};
-  rows_(ss.getSheetByName(SH_SEG), SEG_COLS).forEach(function (r) { seg[r.id] = r; });
+  // Si un ID aparece varias veces, manda la primera fila (la misma que actualizan las acciones);
+  // los campos vacíos se completan con las filas repetidas.
+  rows_(ss.getSheetByName(SH_SEG), SEG_COLS).forEach(function (r) {
+    var id = String(r.id).trim(); r.id = id;
+    if (!seg[id]) { seg[id] = r; return; }
+    SEG_COLS.forEach(function (k) { if (seg[id][k] === '' || seg[id][k] === null) seg[id][k] = r[k]; });
+  });
   var recs = [];
   var al = ss.getSheetByName(SH_ALERTAS);
   if (al.getLastRow() > 1) al.getRange(2, 1, al.getLastRow() - 1, COL_ID).getValues().forEach(function (r) {
@@ -335,6 +345,32 @@ function slack_(text) {
 function link_(id) {
   var u = PropertiesService.getScriptProperties().getProperty('DASHBOARD_URL');
   return u ? '\n<' + u + '?rec=' + id + '|Abrir en el cuadro de mando>' : '';
+}
+/**
+ * Borra de Seguimiento las filas repetidas de un mismo ID, conservando la primera.
+ * Solo borra una repetición si nunca tuvo movimiento (Pendiente, Sin enviar, sin fecha de estado).
+ * Si la fila que se conserva tiene criterio, horizonte o delta vacíos, los toma de la repetición antes de borrarla.
+ */
+function limpiarDuplicadosSeguimiento() {
+  var sh = ss_().getSheetByName(SH_SEG), last = sh.getLastRow();
+  if (last < 2) return;
+  var vals = sh.getRange(2, 1, last - 1, SEG_COLS.length).getValues();
+  var ix = {}; SEG_COLS.forEach(function (k, j) { ix[k] = j; });
+  var primera = {}, borrar = [], conservadas = [];
+  vals.forEach(function (r, i) {
+    var id = String(r[0]).trim(); if (!id) return;
+    if (primera[id] === undefined) { primera[id] = i; return; }
+    var sinMovimiento = String(r[ix.estado]) === 'Pendiente' && String(r[ix.validacion]) === 'Sin enviar' && !r[ix.fecha_estado];
+    if (!sinMovimiento) { conservadas.push(id); return; }
+    var keep = vals[primera[id]];
+    ['criterio', 'horizonte', 'delta'].forEach(function (k) {
+      if (keep[ix[k]] === '' || keep[ix[k]] === null) { keep[ix[k]] = r[ix[k]]; sh.getRange(primera[id] + 2, ix[k] + 1).setValue(r[ix[k]]); }
+    });
+    borrar.push(i + 2);
+  });
+  borrar.reverse().forEach(function (row) { sh.deleteRow(row); });
+  if (borrar.length) log_({ usuario: 'Rebold', role: 'rebold' }, 'Limpieza de duplicados', { id: '—' }, '', borrar.length + ' filas', 'Filas repetidas sin movimiento borradas de Seguimiento');
+  Logger.log('Filas repetidas borradas: ' + borrar.length + (conservadas.length ? ' · repetidas CON movimiento, revisar a mano: ' + conservadas.join(', ') : ''));
 }
 /** Prueba manual: envía un mensaje de prueba a Slack. */
 function probarSlack() { Logger.log(slack_('Prueba del cuadro de mando D1 · Rebold Audit') ? 'Slack OK' : 'Slack NO configurado o falló'); }

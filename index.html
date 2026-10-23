@@ -221,7 +221,7 @@ footer{border-top:1px solid var(--line);padding:18px 0;color:var(--ink3);font-si
     <div class="sec-head">
       <p class="kicker">01 · Macro · Optimization Readiness Index</p>
       <h1>El ORI solo se mueve con <span style="color:var(--accent2)">ajustes validados</span></h1>
-      <p class="lead">ORI = 25% AES + 25% CES + 25% UXCS + 25% AIS. Zelva reporta cada ajuste; el puntaje cambia únicamente cuando Rebold lo aprueba. Lo que espera validación se muestra aparte como potencial.</p>
+      <p class="lead">ORI = 25% AES + 25% CES + 25% UXCS + 25% AIS; cada indicador es el promedio de sus criterios. Zelva reporta cada ajuste; el puntaje cambia únicamente cuando Rebold lo aprueba. Lo que espera validación se muestra aparte como potencial.</p>
     </div>
     <div class="hero">
       <div class="card">
@@ -253,7 +253,7 @@ footer{border-top:1px solid var(--line);padding:18px 0;color:var(--ink3);font-si
     <div class="sec-head">
       <p class="kicker">02 · Meso y micro · Indicadores y criterios</p>
       <h1>Cada indicador, criterio por criterio</h1>
-      <p class="lead">Cada criterio se califica de 0 a 10 con la rúbrica y pesa distinto dentro de su indicador. El puntaje actual es la línea base de la auditoría más los ajustes aprobados.</p>
+      <p class="lead">Cada criterio se califica de 0 a 10 con la rúbrica; el indicador es el promedio de sus criterios. El puntaje actual es la línea base de la auditoría más los ajustes aprobados.</p>
     </div>
     <div class="grid g4" id="indCards"></div>
     <div class="card mt" id="indDetail"></div>
@@ -364,6 +364,9 @@ footer{border-top:1px solid var(--line);padding:18px 0;color:var(--ink3);font-si
 /* ===================== Configuración ===================== */
 const CONFIG = {
   // URL /exec del Web App de Apps Script (apps-script/Code.gs). Vacío = corte oficial de data.js en solo lectura.
+  // 'simple' = promedio simple de criterios, igual que la hoja Resumen_ORI, el plan y el deck.
+  // 'ponderado' = usa los pesos de la hoja Criterios.
+  METODO: 'simple',
   BACKEND_URL: 'https://script.google.com/macros/s/AKfycbwAiPOfm09kJkVj-hO2hKkC90C3oAJo5MnGeYO84Ce9nMM74RfqMeB0HLYqoLHW1vrX/exec',
 };
 const LIVE = !!CONFIG.BACKEND_URL;
@@ -426,14 +429,18 @@ function scores(opts = {}) {
   const ind = {};
   D.indicadores.forEach(i => {
     let s = 0, w = 0;
-    D.criterios.filter(c => c.ind === i.id).forEach(c => { if (crit[c.id] != null) { s += c.peso * crit[c.id]; w += c.peso; } });
-    ind[i.id] = w ? s / w * 10 : null;
+    D.criterios.filter(c => c.ind === i.id).forEach(c => { if (crit[c.id] != null) { s += pesoEf(c) * crit[c.id]; w += pesoEf(c); } });
+    ind[i.id] = w ? round1(s / w * 10) : null;
   });
   const vals = Object.values(ind).filter(v => v != null);
-  const ori = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  const ori = vals.length ? round1(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
   return { crit, ind, ori };
 }
-const recDeltaOri = r => { const c = critById(r.criterio); return c ? c.peso * (+r.delta || 0) * 10 / 4 : 0; };
+// Peso efectivo de un criterio dentro de su indicador según CONFIG.METODO.
+const pesoEf = c => CONFIG.METODO === 'ponderado' ? c.peso : 1 / D.criterios.filter(x => x.ind === c.ind).length;
+// Redondeo a 1 decimal como ROUND(…;1) de la hoja Resumen_ORI.
+const round1 = v => Math.round(v * 10 + 1e-9) / 10;
+const recDeltaOri = r => { const c = critById(r.criterio); return c ? pesoEf(c) * (+r.delta || 0) * 10 / 4 : 0; };
 
 /* ===================== Datos (backend / corte) ===================== */
 async function api(action, payload = {}) {
@@ -573,11 +580,11 @@ function renderInd() {
     const b = bandOf(cur == null ? 0 : cur * 10);
     return `<tr>
       <td><b style="font-weight:500">${esc(c.nombre)}</b><div class="dim" style="font-size:11px">${c.id} · ${esc(c.evalua)}</div>${D.evidencia && D.evidencia[c.id] && D.evidencia[c.id].evidencia ? `<details class="ev"><summary>Evidencia de la auditoría</summary><p>${esc(D.evidencia[c.id].evidencia)}</p><p class="dim">Fuente: ${esc(D.evidencia[c.id].fuente)}</p></details>` : ''}</td>
-      <td class="num">${Math.round(c.peso * 100)}%</td>
+      <td class="num">${fmt1(pesoEf(c) * 100)}%</td>
       <td class="num">${fmt1(base)}</td>
       <td class="num"><b>${fmt1(cur)}</b>${cur - base > 0.05 ? `<div class="delta up">+${fmt1(cur - base)}</div>` : ''}</td>
       <td><div class="hbarc"><div class="t"><span style="width:${(cur ?? 0) * 10}%;background:${b.c}"></span></div><span class="num" style="width:44px">${fmt0((cur ?? 0) * 10)}%</span></div>${pot - cur > 0.05 ? `<div style="font-size:11px;color:var(--b-func)">+${fmt1(pot - cur)} por validar</div>` : ''}</td>
-      <td class="num">${fmt1(cur == null ? null : c.peso * cur * 10)}</td>
+      <td class="num">${fmt1(cur == null ? null : pesoEf(c) * cur * 10)}</td>
       <td class="num"><a href="#" class="muted" onclick="quickFilter({fInd:'${c.ind}',fCrit:'${c.id}'});return false">${ap} / ${recs.length}</a></td>
     </tr>`;
   }).join('');
@@ -592,7 +599,7 @@ function renderInd() {
       <tbody>${rows}</tbody>
       <tfoot><tr><td><b>${i.id}</b> = promedio ponderado × 10</td><td class="num">100%</td><td></td><td></td><td></td><td class="num"><b>${fmt1(v)}</b></td><td></td></tr></tfoot>
     </table></div>
-    <p class="dim" style="font-size:11px;margin:10px 0 0">“Aporta” = peso × score × 10. La suma de la columna es el puntaje del indicador. <a href="#" class="muted" onclick="rubInd='${i.id}';go('rub');return false">Ver la rúbrica de ${i.id} →</a></p>`;
+    <p class="dim" style="font-size:11px;margin:10px 0 0">${CONFIG.METODO === 'ponderado' ? '“Aporta” = peso × score × 10, con los pesos de la hoja Criterios.' : 'Promedio simple de los criterios, igual que la hoja Resumen_ORI: cada criterio pesa lo mismo y “Aporta” = score × 10 ÷ número de criterios.'} La suma de la columna es el puntaje del indicador. <a href="#" class="muted" onclick="rubInd='${i.id}';go('rub');return false">Ver la rúbrica de ${i.id} →</a></p>`;
 }
 
 /* ===================== Render: Seguimiento ===================== */
@@ -700,7 +707,7 @@ function openRec(id) {
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${tipoChip(r.tipo)}${horChip(r.horizonte)}${estadoChip(r.estado)}${valChip(r.validacion)}</div>
     <dl class="kv">
       <dt>Impacto esperado</dt><dd>${esc(r.impacto)}</dd>
-      <dt>Indicador</dt><dd>${r.indicador} · ${esc(c ? c.nombre : 'Sin criterio asignado')}${c ? ` (${Math.round(c.peso * 100)}%)` : ''}</dd>
+      <dt>Indicador</dt><dd>${r.indicador} · ${esc(c ? c.nombre : 'Sin criterio asignado')}${c ? ` (${fmt1(pesoEf(c) * 100)}%)` : ''}</dd>
       <dt>Impacto en score</dt><dd>+${fmt1(r.delta)} al criterio · +${fmt1(recDeltaOri(r))} al ORI</dd>
       <dt>Responsable</dt><dd>${esc(r.responsable)}</dd>
       <dt>Detectado</dt><dd>${fDT(r.fecha_alta)}</dd>
@@ -851,7 +858,7 @@ function renderRub() {
     const s = S.crit[c.id];
     const band = s == null ? -1 : s < 2.5 ? 0 : s < 4.5 ? 1 : s < 6.5 ? 2 : s < 8.5 ? 3 : 4;
     const rub = D.rubrica[c.id] || [];
-    return `<div class="card mt"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><h3>${c.id} · ${esc(c.nombre)}</h3><div class="muted" style="font-size:12px">${esc(c.evalua)}</div></div><div style="text-align:right"><span class="chip">Peso ${Math.round(c.peso * 100)}%</span> <span class="chip">Hoy ${fmt1(s)} / 10</span></div></div>
+    return `<div class="card mt"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><h3>${c.id} · ${esc(c.nombre)}</h3><div class="muted" style="font-size:12px">${esc(c.evalua)}</div></div><div style="text-align:right"><span class="chip">Peso ${fmt1(pesoEf(c) * 100)}%</span> <span class="chip">Hoy ${fmt1(s)} / 10</span></div></div>
       <div class="rub">${RUB_BANDS.map((b, k) => `<div class="${k === band ? 'cur' : ''}"><b>${b}</b>${esc(rub[k] || '')}</div>`).join('')}</div></div>`;
   }).join('');
 }
