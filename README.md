@@ -60,6 +60,20 @@ Al agregar filas en `Alertas_QuickWins_Acciones` hay dos caminos y los dos sirve
 
 `limpiarDuplicadosSeguimiento()` borra filas repetidas de un mismo ID en `Seguimiento`, conservando la primera, y solo si la repetida nunca tuvo movimiento.
 
+## Resumen semanal por correo
+
+Todos los lunes a las 10:00 (hora de Bogotá) el script envía un resumen con lo que falta de cada lado:
+- **Zelva:** ajustes con la fecha límite cumplida, los que vencen esa semana, los devueltos por Rebold con su comentario, las respuestas a sus pedidos de apoyo y los hallazgos nuevos de la última semana.
+- **Rebold:** ajustes realizados que esperan validación (con los días de espera) y pedidos de apoyo o cierres sin responder.
+- **D1:** ajustes con la fecha límite cumplida que dependen de accesos o desarrollo de D1.
+
+Configuración (los correos van en propiedades del script, no en el repositorio):
+1. Propiedad `RESUMEN_DESTINATARIOS`: correos separados por coma. Opcional: `RESUMEN_RESPONDER_A`, el correo al que llegan las respuestas.
+2. Ejecutar `probarResumen()`: envía el resumen solo a quien lo ejecuta.
+3. Ejecutar `instalarResumenSemanal()` una vez. Para apagarlo: `desactivarResumenSemanal()`.
+
+Cada envío queda registrado en `Log_Cambios`.
+
 ## Pendientes del Sheet
 
 - `Mediciones_Mensuales` conserva la fila de ejemplo de UXCS-5 (30 sep, "Nombre responsable"). No afecta el cálculo (se toma la carga más reciente), pero conviene borrarla.

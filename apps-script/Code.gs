@@ -17,8 +17,10 @@
  *   SLACK_REBOLD_ID    usuario (U…) o canal (C…) de Rebold que recibe las notificaciones
  *   DASHBOARD_URL      https://sebastianromero-rebold.github.io/AuditoriaD1/
  *   LOG_BACKUP_ID      lo crea setup()
+ *   RESUMEN_DESTINATARIOS  correos del resumen semanal, separados por coma
+ *   RESUMEN_RESPONDER_A    opcional, correo al que llegan las respuestas del resumen
  */
-var VERSION = '2.0.2';
+var VERSION = '2.1.0';
 var SHEET_ID = '1mUT5FFzteufgbQ1owWbaIWVq-5g4l5Sc79xcF_JAT80';
 var SH_ALERTAS = 'Alertas_QuickWins_Acciones';
 var SH_SEG = 'Seguimiento';
@@ -374,6 +376,148 @@ function limpiarDuplicadosSeguimiento() {
 }
 /** Prueba manual: envía un mensaje de prueba a Slack. */
 function probarSlack() { Logger.log(slack_('Prueba del cuadro de mando D1 · Rebold Audit') ? 'Slack OK' : 'Slack NO configurado o falló'); }
+
+/* ---------------- Resumen semanal por correo ---------------- */
+/**
+ * Envía el resumen semanal a RESUMEN_DESTINATARIOS (propiedad del script, correos separados por coma).
+ * Lo ejecuta el disparador de los lunes 10:00 (ver instalarResumenSemanal).
+ */
+function resumenSemanal() { return enviarResumen_(false); }
+/** Envía el mismo resumen solo a quien ejecuta la función, para revisarlo antes de activarlo. */
+function probarResumen() { return enviarResumen_(true); }
+/** Crea (o recrea) el disparador semanal: lunes entre 10:00 y 10:15, hora de Bogotá. */
+function instalarResumenSemanal() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'resumenSemanal') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('resumenSemanal').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(10).nearMinute(0).inTimezone(TZ).create();
+  Logger.log('Disparador creado: resumenSemanal, lunes 10:00 (' + TZ + ').');
+}
+/** Quita el disparador semanal. */
+function desactivarResumenSemanal() {
+  var n = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'resumenSemanal') { ScriptApp.deleteTrigger(t); n++; } });
+  Logger.log('Disparadores eliminados: ' + n);
+}
+
+function enviarResumen_(soloYo) {
+  var p = PropertiesService.getScriptProperties();
+  var to = soloYo ? Session.getEffectiveUser().getEmail() : String(p.getProperty('RESUMEN_DESTINATARIOS') || '').replace(/\s/g, '');
+  if (!to) throw new Error('Falta la propiedad RESUMEN_DESTINATARIOS (correos separados por coma).');
+  sync_();
+  var d = readAll_(), r = armarResumen_(d);
+  var opts = { to: to, subject: r.asunto, htmlBody: r.html, name: 'Rebold · D1 Audit' };
+  var reply = p.getProperty('RESUMEN_RESPONDER_A'); if (reply) opts.replyTo = reply;
+  MailApp.sendEmail(opts);
+  if (!soloYo) log_({ usuario: 'Sistema', role: 'rebold' }, 'Resumen semanal enviado', { id: '—' }, '', to.split(',').length + ' destinatarios', r.asunto);
+  Logger.log((soloYo ? 'Prueba enviada a ' : 'Resumen enviado a ') + to);
+}
+
+/** Calcula el ORI como el dashboard (promedio simple de criterios, redondeo a 1 decimal). */
+function oriResumen_(d, conPendientes) {
+  var sc = {}; Object.keys(d.base).forEach(function (k) { sc[k] = Number(d.base[k]); });
+  d.recomendaciones.forEach(function (r) {
+    if (sc[r.criterio] === undefined || r.estado !== 'Realizado') return;
+    var ok = r.validacion === 'Aprobado' && String(r.fecha_validacion) > String(d.fecha_base);
+    if (ok || (conPendientes && r.validacion === 'Pendiente validación')) sc[r.criterio] = Math.min(10, sc[r.criterio] + (Number(r.delta) || 0));
+  });
+  var inds = ['AES', 'CES', 'UXCS', 'AIS'], vals = [];
+  inds.forEach(function (i) {
+    var v = Object.keys(sc).filter(function (k) { return k.indexOf(i + '-') === 0; }).map(function (k) { return sc[k]; });
+    if (v.length) vals.push(Math.round(v.reduce(function (a, b) { return a + b; }, 0) / v.length * 100 + 1e-9) / 10);
+  });
+  return vals.length ? Math.round(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length * 10 + 1e-9) / 10 : null;
+}
+
+function armarResumen_(d) {
+  var hoy = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+  var en7 = Utilities.formatDate(new Date(Date.now() + 7 * 864e5), TZ, 'yyyy-MM-dd');
+  var hace7 = Utilities.formatDate(new Date(Date.now() - 7 * 864e5), TZ, "yyyy-MM-dd'T'HH:mm:ss");
+  var dias = function (a, b) { return Math.round((new Date(b + 'T12:00:00') - new Date(String(a).slice(0, 10) + 'T12:00:00')) / 864e5); };
+  var R = d.recomendaciones.filter(function (r) { return r.estado !== 'Descartado' && r.validacion !== 'Cierre ratificado' && r.validacion !== 'Aprobado'; });
+  var esZelva = function (r) { return /zelva/i.test(r.responsable); };
+  var esD1 = function (r) { return !esZelva(r) && /d1/i.test(r.responsable); };
+  var sinCerrar = function (r) { return ['Realizado', 'No se pudo realizar'].indexOf(r.estado) < 0; };
+  var prio = function (a, b) { return (a.prioridad === 'Alta' ? 0 : 1) - (b.prioridad === 'Alta' ? 0 : 1) || String(a.fecha_limite).localeCompare(String(b.fecha_limite)); };
+
+  var zVenc = R.filter(function (r) { return esZelva(r) && sinCerrar(r) && r.fecha_limite && r.fecha_limite < hoy; }).sort(prio);
+  var zSemana = R.filter(function (r) { return esZelva(r) && sinCerrar(r) && r.fecha_limite >= hoy && r.fecha_limite <= en7; }).sort(prio);
+  var zDevueltos = R.filter(function (r) { return r.validacion === 'Devuelto'; }).sort(prio);
+  var zApoyo = R.filter(function (r) { return r.validacion === 'Apoyo en gestión'; }).sort(prio);
+  var nuevos = d.recomendaciones.filter(function (r) { return String(r.fecha_alta) >= hace7; }).sort(prio);
+  var rValidar = R.filter(function (r) { return r.estado === 'Realizado' && r.validacion === 'Pendiente validación'; })
+    .sort(function (a, b) { return String(a.fecha_estado).localeCompare(String(b.fecha_estado)); });
+  var rApoyo = R.filter(function (r) { return r.estado !== 'Realizado' && r.validacion === 'Pendiente validación'; })
+    .sort(function (a, b) { return String(a.fecha_estado).localeCompare(String(b.fecha_estado)); });
+  var d1Venc = R.filter(function (r) { return esD1(r) && sinCerrar(r) && r.fecha_limite && r.fecha_limite < hoy; }).sort(prio);
+
+  var oriHoy = oriResumen_(d, false), oriPot = oriResumen_(d, true), oriBase = oriResumen_({ base: d.base, recomendaciones: [], fecha_base: d.fecha_base }, false);
+  var aprob = d.recomendaciones.filter(function (r) { return r.validacion === 'Aprobado'; }).length;
+  var url = PropertiesService.getScriptProperties().getProperty('DASHBOARD_URL') || '';
+  var fmt = function (n) { return n == null ? '–' : String(n).replace('.', ','); };
+  var fd = function (s) { if (!s) return '–'; var p = String(s).slice(0, 10).split('-'); return p[2] + '/' + p[1]; };
+
+  var C = { ink: '#1a1a1a', dim: '#6b6b70', line: '#e6e6ea', accent: '#CD2B54', ok: '#2e9e63', warn: '#c98a0b', bg: '#f6f6f8' };
+  var link = function (r) { return url ? '<a href="' + url + '?rec=' + r.id + '" style="color:' + C.accent + ';text-decoration:none;font-weight:600">' + r.id + '</a>' : '<b>' + r.id + '</b>'; };
+  var MAX = 12;
+  var tabla = function (rows, cols) {
+    if (!rows.length) return '<p style="margin:6px 0 14px;color:' + C.dim + ';font-size:13px">Nada pendiente aquí. ✓</p>';
+    var h = '<table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px;margin:6px 0 4px">';
+    rows.slice(0, MAX).forEach(function (r) {
+      h += '<tr><td style="padding:7px 8px 7px 0;border-bottom:1px solid ' + C.line + ';vertical-align:top;white-space:nowrap">' + link(r) + '</td>' +
+        '<td style="padding:7px 8px;border-bottom:1px solid ' + C.line + ';vertical-align:top;color:' + C.ink + '">' + esc_(corte_(r.titulo, 160)) +
+        '<div style="color:' + C.dim + ';font-size:12px;margin-top:2px">' + cols(r) + '</div></td></tr>';
+    });
+    h += '</table>';
+    if (rows.length > MAX) h += '<p style="margin:0 0 14px;font-size:12px;color:' + C.dim + '">y ' + (rows.length - MAX) + ' más en el cuadro de mando.</p>';
+    return h;
+  };
+  var h3 = function (t, n, color) { return '<h3 style="margin:18px 0 2px;font-size:14px;color:' + C.ink + '">' + t + ' <span style="display:inline-block;min-width:20px;padding:0 7px;border-radius:10px;background:' + (color || C.accent) + ';color:#fff;font-size:12px;text-align:center">' + n + '</span></h3>'; };
+  var h2 = function (t, s) { return '<h2 style="margin:28px 0 0;padding-top:16px;border-top:2px solid ' + C.ink + ';font-size:17px;text-transform:uppercase;letter-spacing:.03em;color:' + C.ink + '">' + t + '</h2><p style="margin:4px 0 0;color:' + C.dim + ';font-size:13px">' + s + '</p>'; };
+
+  var html = '<div style="font-family:Arial,Helvetica,sans-serif;max-width:680px;margin:0 auto;color:' + C.ink + '">' +
+    '<div style="background:#000;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0"><div style="font-size:12px;letter-spacing:.12em;color:#E04A70;font-weight:700">D1 · REBOLD AUDIT</div>' +
+    '<div style="font-size:20px;font-weight:700;margin-top:4px">Resumen semanal de ajustes</div><div style="font-size:12px;color:#a6a6a8;margin-top:2px">Corte: ' + fd(hoy) + '/' + hoy.slice(0, 4) + '</div></div>' +
+    '<div style="background:' + C.bg + ';padding:18px 22px;border-radius:0 0 10px 10px">' +
+    '<p style="margin:0 0 14px;font-size:14px;line-height:1.5">Hola equipo, este es el resumen de la semana: lo que falta de cada lado para seguir moviendo el ORI. Si algo necesita apoyo, márquenlo como <b>Necesita apoyo</b> en el cuadro de mando o respondan este correo.</p>' +
+    '<table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;text-align:center"><tr>' +
+    kpi_('ORI validado', fmt(oriHoy), 'base ' + fmt(oriBase), C) + kpi_('Potencial', fmt(oriPot), 'si se aprueba lo pendiente', C) +
+    kpi_('Aprobados', aprob, 'de ' + (aprob + R.length) + ' activos', C) + kpi_('Vencidos', zVenc.length + d1Venc.length, 'sin cerrar', C) +
+    '</tr></table>' +
+
+    h2('Lo que falta de Zelva', 'Ajustes en plataformas y pixelación.') +
+    h3('Fecha límite cumplida, sin cerrar', zVenc.length) +
+    tabla(zVenc, function (r) { return r.indicador + ' · ' + r.prioridad + ' · límite ' + fd(r.fecha_limite) + ' (' + dias(r.fecha_limite, hoy) + ' días) · ' + r.estado; }) +
+    h3('Vencen esta semana', zSemana.length, C.warn) +
+    tabla(zSemana, function (r) { return r.indicador + ' · ' + r.prioridad + ' · límite ' + fd(r.fecha_limite) + ' · ' + r.estado; }) +
+    h3('Devueltos por Rebold para completar', zDevueltos.length, C.warn) +
+    tabla(zDevueltos, function (r) { return 'Rebold: ' + esc_(corte_(r.comentario_validacion, 180)); }) +
+    h3('Pedidos de apoyo ya respondidos por Rebold', zApoyo.length, C.ok) +
+    tabla(zApoyo, function (r) { return 'Respuesta: ' + esc_(corte_(r.comentario_validacion, 180)); }) +
+    h3('Hallazgos nuevos de la última semana', nuevos.length, C.dim) +
+    tabla(nuevos, function (r) { return r.tipo + ' · ' + r.indicador + ' · límite ' + fd(r.fecha_limite) + ' · ' + esc_(r.responsable); }) +
+
+    h2('Lo que falta de Rebold', 'Validaciones y respuestas que nos corresponden.') +
+    h3('Realizados esperando nuestra validación', rValidar.length) +
+    tabla(rValidar, function (r) { return 'Reportado ' + fd(r.fecha_estado) + ' · esperando ' + dias(r.fecha_estado, hoy) + ' días · ' + esc_(corte_(r.comentario, 140)); }) +
+    h3('Pedidos de apoyo o cierres sin responder', rApoyo.length) +
+    tabla(rApoyo, function (r) { return r.estado + ' · ' + fd(r.fecha_estado) + ' · Zelva: ' + esc_(corte_(r.comentario, 140)); }) +
+
+    h2('Dependen de D1', 'Accesos y desarrollo que gestionamos con D1.') +
+    h3('Fecha límite cumplida', d1Venc.length, C.dim) +
+    tabla(d1Venc, function (r) { return r.indicador + ' · límite ' + fd(r.fecha_limite) + ' · ' + esc_(r.responsable) + ' · ' + r.estado; }) +
+
+    (url ? '<p style="margin:24px 0 6px;text-align:center"><a href="' + url + '" style="display:inline-block;background:' + C.accent + ';color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:700;font-size:14px">Abrir el cuadro de mando</a></p>' : '') +
+    '<p style="margin:16px 0 0;font-size:11px;color:' + C.dim + ';text-align:center">Resumen automático de los lunes · Rebold · A Post Digital Marketing &amp; Communication Company</p>' +
+    '</div></div>';
+  var asunto = 'D1 · Rebold Audit · Resumen semanal ' + fd(hoy) + ' · ORI ' + fmt(oriHoy) + ' · ' + (zVenc.length + d1Venc.length) + ' vencidos · ' + rValidar.length + ' por validar';
+  return { asunto: asunto, html: html };
+}
+function kpi_(l, v, s, C) {
+  return '<td style="width:25%;padding:4px"><div style="background:#fff;border:1px solid ' + C.line + ';border-radius:8px;padding:10px 6px">' +
+    '<div style="font-size:11px;color:' + C.dim + '">' + l + '</div><div style="font-size:22px;font-weight:700;margin:2px 0">' + v + '</div>' +
+    '<div style="font-size:11px;color:' + C.dim + '">' + s + '</div></div></td>';
+}
+function corte_(t, n) { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1).replace(/\s+\S*$/, '') + '…' : t; }
+function esc_(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
 /* ---------------- Utilidades ---------------- */
 function corta_(t) { t = String(t || ''); return t.length > 220 ? t.slice(0, 217) + '…' : t; }
