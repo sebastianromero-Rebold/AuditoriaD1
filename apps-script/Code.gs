@@ -20,7 +20,7 @@
  *   RESUMEN_DESTINATARIOS  correos del resumen semanal, separados por coma
  *   RESUMEN_RESPONDER_A    opcional, correo al que llegan las respuestas del resumen
  */
-var VERSION = '2.2.0';
+var VERSION = '2.3.0';
 var SHEET_ID = '1mUT5FFzteufgbQ1owWbaIWVq-5g4l5Sc79xcF_JAT80';
 var SH_ALERTAS = 'Alertas_QuickWins_Acciones';
 var SH_SEG = 'Seguimiento';
@@ -134,6 +134,8 @@ function doPost(e) {
     else if (b.action === 'validar') out = validar_(who, b);
     else if (b.action === 'alta') out = alta_(who, b.rec || {});
     else if (b.action === 'editarComentario') out = editarComentario_(who, b);
+    else if (b.action === 'comentar') out = comentar_(who, b);
+    else if (b.action === 'editarNota') out = editarNota_(who, b);
     else throw new Error('Acción desconocida');
     return json_(Object.assign({ ok: true }, out));
   } catch (err) {
@@ -224,6 +226,42 @@ function editarComentario_(who, b) {
   log_(who, 'Edición de comentario', r, antes, com, com);
   return { rec: r };
 }
+/**
+ * Comentario de seguimiento de Rebold sobre un ajuste abierto (en curso, pendiente o con apoyo).
+ * No cambia estado ni ORI. Vive en Log_Cambios como "Comentario de Rebold"; el último por ajuste
+ * (con sus ediciones) se muestra destacado en el dashboard y en el resumen semanal.
+ */
+function comentar_(who, b) {
+  if (who.role !== 'rebold') throw new Error('Solo Rebold puede comentar.');
+  var com = String(b.comentario || '').trim();
+  if (!com) throw new Error('El comentario no puede quedar vacío.');
+  var r = findSeg_(b.id).rec;
+  if (r.estado === 'Descartado' || r.validacion === 'Aprobado' || r.validacion === 'Cierre ratificado') throw new Error('Este ajuste ya está cerrado.');
+  log_(who, 'Comentario de Rebold', r, r.estado, r.estado, com);
+  return { rec: r };
+}
+/** Corrige el último comentario de seguimiento de Rebold. El texto anterior queda en el log. */
+function editarNota_(who, b) {
+  if (who.role !== 'rebold') throw new Error('Solo Rebold puede editar sus comentarios.');
+  var com = String(b.comentario || '').trim();
+  if (!com) throw new Error('El comentario no puede quedar vacío.');
+  var r = findSeg_(b.id).rec, nota = notas_()[r.id];
+  if (!nota) throw new Error('Este ajuste no tiene comentario de seguimiento para editar.');
+  if (nota.texto.trim() === com) throw new Error('El texto es igual al actual.');
+  log_(who, 'Edición de comentario de seguimiento', r, nota.texto, com, com);
+  return { rec: r };
+}
+/** Último comentario de seguimiento de Rebold por ajuste, aplicando sus ediciones posteriores. */
+function notas_(log) {
+  log = log || rows_(ss_().getSheetByName(SH_LOG), LOG_COLS);
+  var out = {};
+  log.forEach(function (l) {
+    var id = String(l.id).trim();
+    if (l.accion === 'Comentario de Rebold') out[id] = { texto: String(l.comentario || ''), ts: String(l.ts), usuario: String(l.usuario), editado: '' };
+    else if (l.accion === 'Edición de comentario de seguimiento' && out[id]) { out[id].texto = String(l.despues || l.comentario || ''); out[id].editado = String(l.ts); }
+  });
+  return out;
+}
 function alta_(who, x) {
   if (who.role !== 'rebold') throw new Error('Solo Rebold sube hallazgos.');
   if (!x.titulo || !x.criterio || !x.fecha_limite) throw new Error('Faltan descripción, criterio o fecha límite.');
@@ -301,6 +339,8 @@ function readAll_() {
     }));
   });
   var log = rows_(ss.getSheetByName(SH_LOG), LOG_COLS).map(function (l) { delete l.snapshot; return l; });
+  var notas = notas_(log);
+  recs.forEach(function (r) { r.nota_rebold = notas[r.id] || null; });
   return {
     cliente: 'D1', agencia: 'Zelva', inicio_plan: INICIO_PLAN, corte: now_(), mes_base: mes,
     fecha_base: fechaBase || (mes ? mes + '-28' : INICIO_PLAN),
@@ -457,6 +497,7 @@ function armarResumen_(d) {
   var zSemana = R.filter(function (r) { return esZelva(r) && sinCerrar(r) && r.fecha_limite >= hoy && r.fecha_limite <= en7; }).sort(prio);
   var zDevueltos = R.filter(function (r) { return r.validacion === 'Devuelto'; }).sort(prio);
   var zApoyo = R.filter(function (r) { return r.validacion === 'Apoyo en gestión'; }).sort(prio);
+  var zNotas = R.filter(function (r) { return r.nota_rebold && (r.nota_rebold.editado || r.nota_rebold.ts) >= hace7; }).sort(prio);
   var nuevos = d.recomendaciones.filter(function (r) { return String(r.fecha_alta) >= hace7; }).sort(prio);
   var rValidar = R.filter(function (r) { return r.estado === 'Realizado' && r.validacion === 'Pendiente validación'; })
     .sort(function (a, b) { return String(a.fecha_estado).localeCompare(String(b.fecha_estado)); });
@@ -507,6 +548,8 @@ function armarResumen_(d) {
     tabla(zDevueltos, function (r) { return 'Rebold: ' + esc_(corte_(r.comentario_validacion, 180)); }) +
     h3('Pedidos de apoyo ya respondidos por Rebold', zApoyo.length, C.ok) +
     tabla(zApoyo, function (r) { return 'Respuesta: ' + esc_(corte_(r.comentario_validacion, 180)); }) +
+    h3('Comentarios de Rebold sobre ajustes en curso', zNotas.length, C.ok) +
+    tabla(zNotas, function (r) { return r.estado + ' · Rebold: ' + esc_(corte_(r.nota_rebold.texto, 200)); }) +
     h3('Hallazgos nuevos de la última semana', nuevos.length, C.dim) +
     tabla(nuevos, function (r) { return r.tipo + ' · ' + r.indicador + ' · límite ' + fd(r.fecha_limite) + ' · ' + esc_(r.responsable); }) +
 

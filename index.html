@@ -659,7 +659,7 @@ function renderSeg() {
       <td data-l="Indicador">${r.indicador}<div class="dim" style="font-size:11px">${esc(c ? c.nombre : 'Sin criterio')}</div></td>
       <td data-l="Horizonte">${horChip(r.horizonte)}</td>
       <td data-l="Límite" style="${late ? 'color:var(--s-no)' : ''}">${fDate(r.fecha_limite)}${late ? '<div style="font-size:11px">Vencida</div>' : ''}</td>
-      <td data-l="Estado">${estadoChip(r.estado)}</td>
+      <td data-l="Estado">${estadoChip(r.estado)}${r.nota_rebold && r.nota_rebold.texto ? `<div style="font-size:11px;color:var(--s-ok);margin-top:3px" title="${esc(r.nota_rebold.texto)}">💬 Comentario de Rebold</div>` : ''}</td>
       <td data-l="Validación">${valChip(r.validacion)}</td>
       <td class="num" data-l="Impacto ORI">+${fmt1(recDeltaOri(r))}</td>
     </tr>`;
@@ -707,6 +707,23 @@ function openRec(id) {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><span class="dim" style="font-size:11px">El texto anterior queda en el historial.</span><span style="display:flex;gap:8px"><button class="btn ghost" id="edCancel">Cancelar</button><button class="btn pri" id="edSave">Guardar cambios</button></span></div></div>
     </div>`;
   }
+  const nota = r.nota_rebold;
+  const cerrado = locked || r.estado === 'Descartado';
+  if (nota && nota.texto && !cerrado) {
+    resp += `<div class="box" style="border-color:var(--s-ok)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h3>Comentario de Rebold</h3>${LIVE && USER.role === 'rebold' ? '<button class="btn ghost" id="noBtn" style="padding:4px 10px;font-size:12px">✎ Editar</button>' : ''}</div>
+      <div class="dim" style="font-size:11px">${esc(nota.usuario)} · ${fDT(nota.ts)}${nota.editado ? ` · editado ${fDT(nota.editado)}` : ''}</div>
+      <div id="noTxt" style="font-size:13px;margin-top:6px;white-space:pre-wrap">${esc(nota.texto)}</div>
+      <div id="noEdit" hidden><div class="field"><textarea id="noCom" style="min-height:110px">${esc(nota.texto)}</textarea></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><span class="dim" style="font-size:11px">El texto anterior queda en el historial.</span><span style="display:flex;gap:8px"><button class="btn ghost" id="noCancel">Cancelar</button><button class="btn pri" id="noSave">Guardar cambios</button></span></div></div>
+    </div>`;
+  }
+  if (LIVE && USER.role === 'rebold' && !cerrado && r.validacion !== 'Pendiente validación') {
+    act += `<div class="box"><h3>${nota ? 'Nuevo comentario para Zelva' : 'Comentar a Zelva'}</h3>
+      <p class="muted" style="font-size:12px;margin:4px 0 0">Para orientar un ajuste en curso: qué falta, qué evidencia esperamos y para cuándo. No cambia el estado ni el ORI.</p>
+      <div class="field"><textarea id="ctCom" placeholder="Ej.: Vimos la exclusión en 3 de 4 campañas; falta AON_TikTok_CPA. Para aprobar, enviar captura de ubicaciones de esa campaña antes del 13/11."></textarea></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px"><button class="btn pri" id="ctGo">Enviar comentario</button></div></div>`;
+  }
   if (r.estado === 'Descartado') {
     act += `<div class="note mt">Hallazgo descartado en la hoja de seguimiento. No suma al ORI.</div>`;
   } else if (locked) {
@@ -728,8 +745,10 @@ function openRec(id) {
       <dt>Tiempo Zelva</dt><dd>${fDur(tRes)}${tVal != null ? ` · validación ${fDur(tVal)}` : ''}</dd>
     </dl>
     ${resp}${act}
-    <div class="box"><h3>Historial</h3><ul class="timeline">${hist.map(e => e.accion === 'Edición de comentario'
-      ? `<li><span class="t">${fDT(e.ts)} · ${esc(e.usuario)}</span><br><b style="font-weight:500">Edición del comentario de Rebold</b><div class="muted" style="margin-top:2px"><span class="dim">Antes:</span> <s>${esc(e.antes)}</s></div><div class="muted"><span class="dim">Ahora:</span> ${esc(e.despues)}</div></li>`
+    <div class="box"><h3>Historial</h3><ul class="timeline">${hist.map(e => e.accion === 'Comentario de Rebold'
+      ? `<li class="v"><span class="t">${fDT(e.ts)} · ${esc(e.usuario)}</span><br><b style="font-weight:500">Comentario de Rebold</b><div class="muted">${esc(e.comentario)}</div></li>`
+      : e.accion === 'Edición de comentario' || e.accion === 'Edición de comentario de seguimiento'
+      ? `<li><span class="t">${fDT(e.ts)} · ${esc(e.usuario)}</span><br><b style="font-weight:500">${e.accion === 'Edición de comentario' ? 'Edición del comentario de Rebold' : 'Edición del comentario de seguimiento'}</b><div class="muted" style="margin-top:2px"><span class="dim">Antes:</span> <s>${esc(e.antes)}</s></div><div class="muted"><span class="dim">Ahora:</span> ${esc(e.despues)}</div></li>`
       : `<li class="${e.accion === 'Aprobado' ? 'v' : ''}"><span class="t">${fDT(e.ts)} · ${esc(e.usuario)}</span><br><b style="font-weight:500">${esc(e.accion)}</b>${e.antes || e.despues ? ` · ${esc(e.antes || '—')} → ${esc(e.despues)}` : ''}${e.comentario ? `<div class="muted">${esc(e.comentario)}</div>` : ''}</li>`).join('') || '<li>Sin movimientos</li>'}</ul></div>`;
   $('#drawer').classList.add('on'); $('#scrim').classList.add('on'); $('#drawer').setAttribute('aria-hidden', 'false');
   history.replaceState(null, '', '?rec=' + id);
@@ -746,19 +765,30 @@ function openRec(id) {
     if (st !== 'En curso' && !com) return toast('Falta el comentario', 'Explica qué se hizo o por qué.');
     await act_('estado', { id, estado: st, comentario: com }, `Estado actualizado: ${st}`);
   };
-  const edBtn = $('#edBtn');
-  if (edBtn) {
-    const toggle = on => { $('#respEdit').hidden = !on; $('#respTxt').hidden = on; edBtn.hidden = on; if (on) $('#edCom').focus(); };
-    edBtn.onclick = () => toggle(true);
-    $('#edCancel').onclick = () => { $('#edCom').value = r.comentario_validacion; toggle(false); };
-    $('#edSave').onclick = async () => {
-      const com = $('#edCom').value.trim();
+  // Editor en línea: pre = prefijo de los ids (ed = devolución/apoyo, no = comentario de seguimiento)
+  const editor = (pre, original, action) => {
+    const btn = $('#' + pre + 'Btn'); if (!btn) return;
+    const box = $('#' + pre + 'Edit'), txt = $('#' + pre + 'Txt'), ta = $('#' + pre + 'Com');
+    const toggle = on => { box.hidden = !on; txt.hidden = on; btn.hidden = on; if (on) ta.focus(); };
+    btn.onclick = () => toggle(true);
+    $('#' + pre + 'Cancel').onclick = () => { ta.value = original; toggle(false); };
+    $('#' + pre + 'Save').onclick = async () => {
+      const com = ta.value.trim();
       if (!com) return toast('El comentario no puede quedar vacío', '');
-      if (com === String(r.comentario_validacion).trim()) return toast('Sin cambios', 'El texto es igual al actual.');
-      $('#edSave').disabled = true;
-      await act_('editarComentario', { id, comentario: com }, 'Comentario actualizado · el anterior quedó en el historial');
+      if (com === String(original).trim()) return toast('Sin cambios', 'El texto es igual al actual.');
+      $('#' + pre + 'Save').disabled = true;
+      await act_(action, { id, comentario: com }, 'Comentario actualizado · el anterior quedó en el historial');
     };
-  }
+  };
+  editor('ed', r.comentario_validacion, 'editarComentario');
+  if (nota) editor('no', nota.texto, 'editarNota');
+  const ctGo = $('#ctGo');
+  if (ctGo) ctGo.onclick = async () => {
+    const com = $('#ctCom').value.trim();
+    if (!com) return toast('Escribe el comentario', '');
+    ctGo.disabled = true;
+    await act_('comentar', { id, comentario: com }, 'Comentario enviado · Zelva lo verá en el ajuste y en el resumen del lunes');
+  };
   document.querySelectorAll('#vaBtns button').forEach(b => b.onclick = async () => {
     const com = $('#vaCom').value.trim();
     if (b.dataset.d !== 'aprobar' && !com) return toast('Falta el comentario', 'Explica la decisión para la trazabilidad.');
@@ -864,7 +894,7 @@ function renderLog() {
   setupLogFilters();
   const q = $('#lQ').value.trim().toLowerCase(), a = $('#lAcc').value, ro = $('#lRol').value;
   const rows = D.log.filter(e => (!a || e.accion === a) && (!ro || e.rol === ro) && (!q || (e.id + ' ' + e.usuario + ' ' + e.comentario + ' ' + e.accion).toLowerCase().includes(q))).slice().reverse();
-  $('#logTable tbody').innerHTML = rows.map(e => `<tr class="click" onclick="openRec('${e.id}')"><td class="num" style="text-align:left">${fDT(e.ts)}</td><td>${e.id}</td><td>${esc(e.accion)}</td><td style="max-width:340px">${e.accion === 'Edición de comentario' ? '<span class="dim">Comentario editado</span>' : esc(e.antes || '—') + ' → ' + esc(e.despues)}</td><td>${esc(e.usuario)}<div class="dim" style="font-size:11px">${esc(e.rol)}</div></td><td class="muted" style="max-width:340px">${esc(e.comentario)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Sin registros</td></tr>';
+  $('#logTable tbody').innerHTML = rows.map(e => `<tr class="click" onclick="openRec('${e.id}')"><td class="num" style="text-align:left">${fDT(e.ts)}</td><td>${e.id}</td><td>${esc(e.accion)}</td><td style="max-width:340px">${e.accion === 'Edición de comentario' || e.accion === 'Edición de comentario de seguimiento' ? '<span class="dim">Comentario editado</span>' : e.accion === 'Comentario de Rebold' ? '<span class="dim">Comentario</span>' : esc(e.antes || '—') + ' → ' + esc(e.despues)}</td><td>${esc(e.usuario)}<div class="dim" style="font-size:11px">${esc(e.rol)}</div></td><td class="muted" style="max-width:340px">${esc(e.comentario)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Sin registros</td></tr>';
 }
 ['lQ', 'lAcc', 'lRol'].forEach(id => $('#' + id).addEventListener(id === 'lQ' ? 'input' : 'change', renderLog));
 function csv(rows, name) {
