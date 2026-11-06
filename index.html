@@ -695,6 +695,18 @@ function openRec(id) {
       <div class="field">Comentario de validación<textarea id="vaCom" placeholder="Evidencia revisada, condiciones o motivo de devolución…"></textarea></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px" id="vaBtns">${btns}</div></div>`;
   }
+  const editable = ['Devuelto', 'Apoyo en gestión'].includes(r.validacion);
+  let resp = '';
+  if (editable && r.comentario_validacion) {
+    const ed = D.log.filter(e => e.id === id && e.accion === 'Edición de comentario');
+    resp = `<div class="box" id="respBox" style="border-color:var(--s-curso)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h3>${r.validacion === 'Devuelto' ? 'Motivo de la devolución' : 'Respuesta de Rebold'}</h3>${LIVE && USER.role === 'rebold' ? '<button class="btn ghost" id="edBtn" style="padding:4px 10px;font-size:12px">✎ Editar</button>' : ''}</div>
+      <div class="dim" style="font-size:11px">${esc(r.validado_por)} · ${fDT(r.fecha_validacion)}${ed.length ? ` · editado ${fDT(ed[ed.length - 1].ts)}` : ''}</div>
+      <div id="respTxt" style="font-size:13px;margin-top:6px;white-space:pre-wrap">${esc(r.comentario_validacion)}</div>
+      <div id="respEdit" hidden><div class="field"><textarea id="edCom" style="min-height:120px">${esc(r.comentario_validacion)}</textarea></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px"><span class="dim" style="font-size:11px">El texto anterior queda en el historial.</span><span style="display:flex;gap:8px"><button class="btn ghost" id="edCancel">Cancelar</button><button class="btn pri" id="edSave">Guardar cambios</button></span></div></div>
+    </div>`;
+  }
   if (r.estado === 'Descartado') {
     act += `<div class="note mt">Hallazgo descartado en la hoja de seguimiento. No suma al ORI.</div>`;
   } else if (locked) {
@@ -715,8 +727,10 @@ function openRec(id) {
       <dt>Último reporte</dt><dd>${r.fecha_estado ? fDT(r.fecha_estado) : '–'}${r.comentario ? `<div class="muted" style="font-size:12px">“${esc(r.comentario)}”</div>` : ''}</dd>
       <dt>Tiempo Zelva</dt><dd>${fDur(tRes)}${tVal != null ? ` · validación ${fDur(tVal)}` : ''}</dd>
     </dl>
-    ${act}
-    <div class="box"><h3>Historial</h3><ul class="timeline">${hist.map(e => `<li class="${e.accion === 'Aprobado' ? 'v' : ''}"><span class="t">${fDT(e.ts)} · ${esc(e.usuario)}</span><br><b style="font-weight:500">${esc(e.accion)}</b>${e.antes || e.despues ? ` · ${esc(e.antes || '—')} → ${esc(e.despues)}` : ''}${e.comentario ? `<div class="muted">${esc(e.comentario)}</div>` : ''}</li>`).join('') || '<li>Sin movimientos</li>'}</ul></div>`;
+    ${resp}${act}
+    <div class="box"><h3>Historial</h3><ul class="timeline">${hist.map(e => e.accion === 'Edición de comentario'
+      ? `<li><span class="t">${fDT(e.ts)} · ${esc(e.usuario)}</span><br><b style="font-weight:500">Edición del comentario de Rebold</b><div class="muted" style="margin-top:2px"><span class="dim">Antes:</span> <s>${esc(e.antes)}</s></div><div class="muted"><span class="dim">Ahora:</span> ${esc(e.despues)}</div></li>`
+      : `<li class="${e.accion === 'Aprobado' ? 'v' : ''}"><span class="t">${fDT(e.ts)} · ${esc(e.usuario)}</span><br><b style="font-weight:500">${esc(e.accion)}</b>${e.antes || e.despues ? ` · ${esc(e.antes || '—')} → ${esc(e.despues)}` : ''}${e.comentario ? `<div class="muted">${esc(e.comentario)}</div>` : ''}</li>`).join('') || '<li>Sin movimientos</li>'}</ul></div>`;
   $('#drawer').classList.add('on'); $('#scrim').classList.add('on'); $('#drawer').setAttribute('aria-hidden', 'false');
   history.replaceState(null, '', '?rec=' + id);
   // eventos
@@ -732,6 +746,19 @@ function openRec(id) {
     if (st !== 'En curso' && !com) return toast('Falta el comentario', 'Explica qué se hizo o por qué.');
     await act_('estado', { id, estado: st, comentario: com }, `Estado actualizado: ${st}`);
   };
+  const edBtn = $('#edBtn');
+  if (edBtn) {
+    const toggle = on => { $('#respEdit').hidden = !on; $('#respTxt').hidden = on; edBtn.hidden = on; if (on) $('#edCom').focus(); };
+    edBtn.onclick = () => toggle(true);
+    $('#edCancel').onclick = () => { $('#edCom').value = r.comentario_validacion; toggle(false); };
+    $('#edSave').onclick = async () => {
+      const com = $('#edCom').value.trim();
+      if (!com) return toast('El comentario no puede quedar vacío', '');
+      if (com === String(r.comentario_validacion).trim()) return toast('Sin cambios', 'El texto es igual al actual.');
+      $('#edSave').disabled = true;
+      await act_('editarComentario', { id, comentario: com }, 'Comentario actualizado · el anterior quedó en el historial');
+    };
+  }
   document.querySelectorAll('#vaBtns button').forEach(b => b.onclick = async () => {
     const com = $('#vaCom').value.trim();
     if (b.dataset.d !== 'aprobar' && !com) return toast('Falta el comentario', 'Explica la decisión para la trazabilidad.');
@@ -837,7 +864,7 @@ function renderLog() {
   setupLogFilters();
   const q = $('#lQ').value.trim().toLowerCase(), a = $('#lAcc').value, ro = $('#lRol').value;
   const rows = D.log.filter(e => (!a || e.accion === a) && (!ro || e.rol === ro) && (!q || (e.id + ' ' + e.usuario + ' ' + e.comentario + ' ' + e.accion).toLowerCase().includes(q))).slice().reverse();
-  $('#logTable tbody').innerHTML = rows.map(e => `<tr class="click" onclick="openRec('${e.id}')"><td class="num" style="text-align:left">${fDT(e.ts)}</td><td>${e.id}</td><td>${esc(e.accion)}</td><td>${esc(e.antes || '—')} → ${esc(e.despues)}</td><td>${esc(e.usuario)}<div class="dim" style="font-size:11px">${esc(e.rol)}</div></td><td class="muted" style="max-width:340px">${esc(e.comentario)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Sin registros</td></tr>';
+  $('#logTable tbody').innerHTML = rows.map(e => `<tr class="click" onclick="openRec('${e.id}')"><td class="num" style="text-align:left">${fDT(e.ts)}</td><td>${e.id}</td><td>${esc(e.accion)}</td><td style="max-width:340px">${e.accion === 'Edición de comentario' ? '<span class="dim">Comentario editado</span>' : esc(e.antes || '—') + ' → ' + esc(e.despues)}</td><td>${esc(e.usuario)}<div class="dim" style="font-size:11px">${esc(e.rol)}</div></td><td class="muted" style="max-width:340px">${esc(e.comentario)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Sin registros</td></tr>';
 }
 ['lQ', 'lAcc', 'lRol'].forEach(id => $('#' + id).addEventListener(id === 'lQ' ? 'input' : 'change', renderLog));
 function csv(rows, name) {

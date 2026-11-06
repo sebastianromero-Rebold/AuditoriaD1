@@ -20,7 +20,7 @@
  *   RESUMEN_DESTINATARIOS  correos del resumen semanal, separados por coma
  *   RESUMEN_RESPONDER_A    opcional, correo al que llegan las respuestas del resumen
  */
-var VERSION = '2.1.0';
+var VERSION = '2.2.0';
 var SHEET_ID = '1mUT5FFzteufgbQ1owWbaIWVq-5g4l5Sc79xcF_JAT80';
 var SH_ALERTAS = 'Alertas_QuickWins_Acciones';
 var SH_SEG = 'Seguimiento';
@@ -133,6 +133,7 @@ function doPost(e) {
     if (b.action === 'estado') out = cambiarEstado_(who, b);
     else if (b.action === 'validar') out = validar_(who, b);
     else if (b.action === 'alta') out = alta_(who, b.rec || {});
+    else if (b.action === 'editarComentario') out = editarComentario_(who, b);
     else throw new Error('Acción desconocida');
     return json_(Object.assign({ ok: true }, out));
   } catch (err) {
@@ -207,6 +208,20 @@ function validar_(who, b) {
   syncEstadoAlerta_(r);
   log_(who, nueva, r, antes, nueva, com);
   if (b.decision === 'aprobar') slack_(':white_check_mark: *' + r.id + ' aprobado* por Rebold (' + who.usuario + '). El ORI se recalcula.' + link_(r.id));
+  return { rec: r };
+}
+/** Rebold corrige el texto de una devolución o de una respuesta de apoyo. El texto anterior queda en el log. */
+function editarComentario_(who, b) {
+  if (who.role !== 'rebold') throw new Error('Solo Rebold puede editar sus comentarios.');
+  var com = String(b.comentario || '').trim();
+  if (!com) throw new Error('El comentario no puede quedar vacío.');
+  var f = findSeg_(b.id), r = f.rec;
+  if (['Devuelto', 'Apoyo en gestión'].indexOf(String(r.validacion)) < 0) throw new Error('Solo se editan comentarios de ajustes devueltos o con apoyo respondido.');
+  var antes = String(r.comentario_validacion || '');
+  if (antes.trim() === com) throw new Error('El texto es igual al actual.');
+  r.comentario_validacion = com;
+  writeSeg_(f.row, r);
+  log_(who, 'Edición de comentario', r, antes, com, com);
   return { rec: r };
 }
 function alta_(who, x) {

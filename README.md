@@ -42,6 +42,7 @@ ORI           = promedio de AES, CES, UXCS y AIS (25% c/u)
 2. **Zelva** lo marca: *En curso*, *Realizado*, *Necesita apoyo* o *No se pudo realizar* (las tres últimas exigen el porqué).
 3. Cada cambio **notifica a Rebold por Slack** con el enlace directo al hallazgo.
 4. **Rebold** aprueba (mueve el ORI), devuelve a Zelva, ratifica un cierre no realizable o registra el apoyo.
+   Si el ajuste quedó *Devuelto* o con *Apoyo en gestión*, Rebold puede corregir su comentario con **✎ Editar**. El texto anterior queda en el historial del ajuste y en `Log_Cambios` como *Edición de comentario*.
 5. La columna *Estado* de `Alertas_QuickWins_Acciones` se actualiza sola (Pendiente / En curso / Completado / Descartado), así `Resumen_ORI` sigue contando bien.
 6. Todo queda en `Log_Cambios` y en el Google Sheet de respaldo `D1_Rebold_Audit_Log_Respaldo`, con una copia completa del registro en cada movimiento.
 
