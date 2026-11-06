@@ -552,3 +552,4 @@ function hrs_(a, b) {
   var da = new Date(String(a).replace(' ', 'T')), db = new Date(String(b).replace(' ', 'T'));
   return Math.round((db - da) / 36e5 * 10) / 10;
 }
+
