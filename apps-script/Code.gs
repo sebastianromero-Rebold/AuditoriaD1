@@ -20,7 +20,7 @@
  *   RESUMEN_DESTINATARIOS  correos del resumen semanal, separados por coma
  *   RESUMEN_RESPONDER_A    opcional, correo al que llegan las respuestas del resumen
  */
-var VERSION = '2.3.0';
+var VERSION = '2.3.1';
 var SHEET_ID = '1mUT5FFzteufgbQ1owWbaIWVq-5g4l5Sc79xcF_JAT80';
 var SH_ALERTAS = 'Alertas_QuickWins_Acciones';
 var SH_SEG = 'Seguimiento';
@@ -440,6 +440,13 @@ function probarSlack() { Logger.log(slack_('Prueba del cuadro de mando D1 · Reb
 function resumenSemanal() { return enviarResumen_(false); }
 /** Envía el mismo resumen solo a quien ejecuta la función, para revisarlo antes de activarlo. */
 function probarResumen() { return enviarResumen_(true); }
+/** Lista los disparadores de ESTA cuenta y quién está ejecutando. Los de otras cuentas no se ven aquí. */
+function revisarDisparadores() {
+  Logger.log('Cuenta actual: ' + Session.getEffectiveUser().getEmail());
+  var t = ScriptApp.getProjectTriggers();
+  Logger.log('Disparadores de esta cuenta: ' + t.length);
+  t.forEach(function (x) { Logger.log(' - ' + x.getHandlerFunction() + ' · ' + x.getEventType()); });
+}
 /** Crea (o recrea) el disparador semanal: lunes entre 10:00 y 10:15, hora de Bogotá. */
 function instalarResumenSemanal() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'resumenSemanal') ScriptApp.deleteTrigger(t); });
@@ -461,9 +468,10 @@ function enviarResumen_(soloYo) {
   var d = readAll_(), r = armarResumen_(d);
   var opts = { to: to, subject: r.asunto, htmlBody: r.html, name: 'Rebold · D1 Audit' };
   var reply = p.getProperty('RESUMEN_RESPONDER_A'); if (reply) opts.replyTo = reply;
+  var desde = Session.getEffectiveUser().getEmail() || '(cuenta sin correo visible)';
   MailApp.sendEmail(opts);
-  if (!soloYo) log_({ usuario: 'Sistema', role: 'rebold' }, 'Resumen semanal enviado', { id: '—' }, '', to.split(',').length + ' destinatarios', r.asunto);
-  Logger.log((soloYo ? 'Prueba enviada a ' : 'Resumen enviado a ') + to);
+  if (!soloYo) log_({ usuario: 'Sistema', role: 'rebold' }, 'Resumen semanal enviado', { id: '—' }, 'desde ' + desde, to.split(',').length + ' destinatarios', r.asunto + ' · para: ' + to);
+  Logger.log((soloYo ? 'Prueba enviada a ' : 'Resumen enviado a ') + to + ' · desde ' + desde + ' · cupo restante hoy: ' + MailApp.getRemainingDailyQuota());
 }
 
 /** Calcula el ORI como el dashboard (promedio simple de criterios, redondeo a 1 decimal). */
