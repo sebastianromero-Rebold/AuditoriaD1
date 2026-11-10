@@ -12,7 +12,8 @@
  * Propiedades del script (Configuración del proyecto → Propiedades del script):
  *   ZELVA_CODE         código de acceso de Zelva (reporta estados)
  *   REBOLD_CODE        código de Rebold (valida y sube hallazgos)
- *   LECTURA_CODE       opcional, solo lectura (ej. D1)
+ *   D1_CODE            código del equipo de D1 (reporta los ajustes a cargo de D1)
+ *   LECTURA_CODE       opcional, solo lectura
  *   SLACK_BOT_TOKEN    xoxb-… (scope chat:write). Alternativa: SLACK_WEBHOOK_URL
  *   SLACK_REBOLD_ID    usuario (U…) o canal (C…) de Rebold que recibe las notificaciones
  *   DASHBOARD_URL      https://sebastianromero-rebold.github.io/AuditoriaD1/
@@ -20,7 +21,7 @@
  *   RESUMEN_DESTINATARIOS  correos del resumen semanal, separados por coma
  *   RESUMEN_RESPONDER_A    opcional, correo al que llegan las respuestas del resumen
  */
-var VERSION = '2.3.1';
+var VERSION = '2.4.0';
 var SHEET_ID = '1mUT5FFzteufgbQ1owWbaIWVq-5g4l5Sc79xcF_JAT80';
 var SH_ALERTAS = 'Alertas_QuickWins_Acciones';
 var SH_SEG = 'Seguimiento';
@@ -147,7 +148,7 @@ function auth_(code) {
   var p = PropertiesService.getScriptProperties();
   code = String(code || '').trim();
   if (!code) throw new Error('Falta el código de acceso (parámetro code)');
-  var map = { zelva: 'ZELVA_CODE', rebold: 'REBOLD_CODE', lectura: 'LECTURA_CODE' }, hay = 0;
+  var map = { zelva: 'ZELVA_CODE', rebold: 'REBOLD_CODE', d1: 'D1_CODE', lectura: 'LECTURA_CODE' }, hay = 0;
   for (var role in map) {
     var c = String(p.getProperty(map[role]) || '').trim();
     if (c) hay++;
@@ -168,8 +169,17 @@ function revisarConfiguracion() {
 }
 
 /* ---------------- Acciones ---------------- */
+/** Equipos que pueden reportar un ajuste según su responsable: D1 si dice "D1"; Zelva si dice "Zelva" o no nombra a D1. */
+function puedeReportar_(role, responsable) {
+  var t = String(responsable || '');
+  if (role === 'd1') return /d1/i.test(t);
+  if (role === 'zelva') return /zelva/i.test(t) || !/d1/i.test(t);
+  return false;
+}
 function cambiarEstado_(who, b) {
-  if (who.role !== 'zelva') throw new Error('Solo Zelva reporta el estado de un ajuste.');
+  if (who.role !== 'zelva' && who.role !== 'd1') throw new Error('Solo Zelva o D1 reportan el estado de un ajuste.');
+  var resp0 = alerta_(b.id).responsable;
+  if (!puedeReportar_(who.role, resp0)) throw new Error('Este ajuste está a cargo de ' + (resp0 || 'otro equipo') + '; no lo puede reportar ' + (who.role === 'd1' ? 'D1' : 'Zelva') + '.');
   if (ESTADOS_ZELVA.indexOf(b.estado) < 0) throw new Error('Estado inválido');
   var com = String(b.comentario || '').trim();
   if (b.estado !== 'En curso' && !com) throw new Error('El comentario es obligatorio para este estado.');
@@ -185,7 +195,7 @@ function cambiarEstado_(who, b) {
   syncEstadoAlerta_(r);
   log_(who, 'Cambio de estado', r, antes, b.estado, com);
   var a = alerta_(r.id);
-  var txt = '*D1 · Rebold Audit* — ' + who.usuario + ' (Zelva) reportó un cambio\n' +
+  var txt = '*D1 · Rebold Audit* — ' + who.usuario + ' (' + (who.role === 'd1' ? 'D1' : 'Zelva') + ') reportó un cambio\n' +
     '*' + r.id + '* · ' + a.tipo + ' · ' + a.indicador + (r.criterio ? ' · ' + r.criterio : '') + '\n' + corta_(a.descripcion) + '\n' +
     'Estado: ' + antes + ' → *' + b.estado + '*' + (com ? '\n> ' + com : '') +
     (r.validacion === 'Pendiente validación' ? '\n:hourglass: Requiere validación de Rebold para mover el ORI.' : '') + link_(r.id);
@@ -349,8 +359,8 @@ function readAll_() {
 }
 function alerta_(id) {
   var al = ss_().getSheetByName(SH_ALERTAS), v = al.getRange(2, 1, al.getLastRow() - 1, COL_ID).getValues();
-  for (var i = 0; i < v.length; i++) if (String(v[i][COL_ID - 1]) === id) return { indicador: v[i][2], tipo: v[i][3], descripcion: String(v[i][5]) };
-  return { indicador: '', tipo: '', descripcion: '' };
+  for (var i = 0; i < v.length; i++) if (String(v[i][COL_ID - 1]) === id) return { indicador: v[i][2], tipo: v[i][3], descripcion: String(v[i][5]), responsable: String(v[i][7]) };
+  return { indicador: '', tipo: '', descripcion: '', responsable: '' };
 }
 function values_(sh) { return sh ? sh.getDataRange().getValues() : []; }
 function rows_(sh, cols) {
@@ -374,7 +384,7 @@ function writeSeg_(row, r) {
 
 /* ---------------- Log + respaldo ---------------- */
 function log_(who, accion, rec, antes, despues, comentario) {
-  var row = [now_(), who.usuario || who.role, { zelva: 'Zelva', rebold: 'Rebold', lectura: 'Lectura' }[who.role] || who.role,
+  var row = [now_(), who.usuario || who.role, { zelva: 'Zelva', rebold: 'Rebold', d1: 'D1', lectura: 'Lectura' }[who.role] || who.role,
     accion, rec.id, antes, despues, comentario || '', JSON.stringify(rec)];
   ss_().getSheetByName(SH_LOG).appendRow(row);
   try {
@@ -431,6 +441,91 @@ function limpiarDuplicadosSeguimiento() {
 }
 /** Prueba manual: envía un mensaje de prueba a Slack. */
 function probarSlack() { Logger.log(slack_('Prueba del cuadro de mando D1 · Rebold Audit') ? 'Slack OK' : 'Slack NO configurado o falló'); }
+
+/* ---------------- Acuerdos de UX con D1 (Diagnóstico UX · noviembre 2026) ---------------- */
+// Fuente: reunión de diagnóstico UX con el equipo de D1 y slide 14 (plan técnico de Core Web Vitals).
+// Fechas límite propuestas por Rebold; se pueden ajustar en Alertas_QuickWins_Acciones.
+var ACUERDOS_UX = [
+  { k: 'UX01', ind: 'UXCS', crit: 'UXCS-1', tipo: 'Proceso en curso', prio: 'Alta', hor: 'Mediano plazo', lim: '2026-12-18', resp: 'D1 (UX)',
+    desc: 'Revisar a nivel técnico los tiempos de carga del sitio: hoy el 56% de los clics de Meta no llega a cargar la página.',
+    imp: 'Más clics pagos convertidos en sesiones reales (meta: subir del 44% de clics que cargan).' },
+  { k: 'UX02', ind: 'UXCS', crit: 'UXCS-2', tipo: 'Quick Win', prio: 'Media', hor: 'Quick win', lim: '2026-11-27', resp: 'D1 (UX)',
+    desc: 'Reducir el tamaño del banner principal del home e incluir creatividades de las categorías con mayor distribución y venta.',
+    imp: 'Los productos suben a la primera pantalla; la promo pasa a una franja que no empuja el catálogo.' },
+  { k: 'UX03', ind: 'UXCS', crit: 'UXCS-2', tipo: 'Quick Win', prio: 'Alta', hor: 'Quick win', lim: '2026-11-27', resp: 'D1 (UX)',
+    desc: 'Justo debajo del banner del home, mostrar la categoría más vendida para que se vea en el primer pantallazo apenas carga la página.',
+    imp: 'Precio y "Agregar" sin scroll (hoy el primer "Agregar" está a 1.191 px).' },
+  { k: 'UX04', ind: 'UXCS', crit: 'UXCS-2', tipo: 'Quick Win', prio: 'Media', hor: 'Quick win', lim: '2026-11-27', resp: 'D1 (UX)',
+    desc: 'Incluir banners que resalten el concepto de ahorro de D1, coherentes con la tienda física, la esencia de marca y el e-commerce.',
+    imp: 'El ahorro, la razón de ir a D1, se ve en el sitio (hoy 462 productos de Extraordinarios sin precio anterior ni vigencia).' },
+  { k: 'UX05', ind: 'UXCS', crit: 'UXCS-3', tipo: 'Proceso en curso', prio: 'Alta', hor: 'Mediano plazo', lim: '2026-12-11', resp: 'D1 (UX)',
+    desc: 'Revisar la carga de los botones "Agregar": hoy tardan entre 6,8 y 10,2 s en quedar disponibles.',
+    imp: 'Más visitas que agregan al carrito (hoy 3%).' },
+  { k: 'UX06', ind: 'UXCS', crit: 'UXCS-3', tipo: 'Quick Win', prio: 'Alta', hor: 'Quick win', lim: '2026-11-27', resp: 'D1 (UX)',
+    desc: 'Cambiar el texto de los botones "Finalizar compra" por "Continuar" o "Siguiente", y dejar "Finalizar compra" solo cuando ya estén cargados los datos del usuario y el pago.',
+    imp: 'Menos pasos percibidos y menos pérdida entre carrito y minicarrito (hoy −47%).' },
+  { k: 'UX07', ind: 'UXCS', crit: 'UXCS-3', tipo: 'Proceso en curso', prio: 'Media', hor: 'Mediano plazo', lim: '2026-12-11', resp: 'D1 (UX)',
+    desc: 'Confirmar y seguir validando los ajustes del buscador: tolerar sinónimos y errores de escritura, y nunca dejar "sin resultados"; si el producto no está en stock, sugerir similares.',
+    imp: 'La visita con más intención de compra encuentra el producto (medir en GA4 búsquedas sin resultado).' },
+  { k: 'UX08', ind: 'UXCS', crit: 'UXCS-4', tipo: 'Quick Win', prio: 'Media', hor: 'Quick win', lim: '2026-11-27', resp: 'D1 (UX)',
+    desc: 'Mostrar siempre las categorías del home en una fila horizontal, para evitar tanto scroll vertical en móvil.',
+    imp: 'Menos scroll y menos carga en la primera pantalla.' },
+  { k: 'UX09', ind: 'CES', crit: 'CES-2', tipo: 'Proceso en curso', prio: 'Media', hor: 'Mediano plazo', lim: '2026-12-11', resp: 'D1 + Zelva',
+    desc: 'Aprovechar la landing "Aprovecha nuestros precios bajos ahora" para campañas con direccionamiento directo a esas promociones y fortalecer los productos con descuento.',
+    imp: 'La pauta aterriza en la oferta que promete el anuncio.' },
+  { k: 'UX10', ind: 'UXCS', crit: 'UXCS-4', tipo: 'Proceso en curso', prio: 'Media', hor: 'Mediano plazo', lim: '2026-12-11', resp: 'D1 (UX)',
+    desc: 'Incentivar la descarga de la app desde el sitio web con un banner fijo y discreto ("Abrir en la app"), nunca una ventana que tape la página.',
+    imp: 'La app convierte 1,7 veces más (2,61% vs 1,5%); pasar 10% del tráfico web a la app ≈ +4% pedidos.' },
+  { k: 'UX11', ind: 'UXCS', crit: 'UXCS-3', tipo: 'Proceso en curso', prio: 'Media', hor: 'Mediano plazo', lim: '2026-12-11', resp: 'D1 (UX)',
+    desc: 'Cuando se agregue un producto desde el sitio en móvil, invitar a terminar la compra en la app con un enlace que abra la app en el mismo carrito.',
+    imp: 'Impulsa la descarga de la app y que la compra termine donde más convierte.' },
+  { k: 'UX12', ind: 'UXCS', crit: 'UXCS-1', tipo: 'Proceso en curso', prio: 'Alta', hor: 'Mediano plazo', lim: '2026-12-18', resp: 'D1 (Tech)',
+    desc: 'LCP (3,5 s → ≤ 2,5 s): banner principal en WebP o AVIF con prioridad alta; sin carga diferida en la primera pantalla; CSS y fuente críticos primero y el resto después.',
+    imp: 'El contenido principal carga antes; seguimiento semanal en PageSpeed Insights (usuarios reales, 28 días).' },
+  { k: 'UX13', ind: 'UXCS', crit: 'UXCS-1', tipo: 'Proceso en curso', prio: 'Alta', hor: 'Mediano plazo', lim: '2026-12-18', resp: 'D1 (Tech)',
+    desc: 'INP (397 → ≤ 200 ms, prioridad 1): cargar primero el carrito y el botón "Agregar"; diferir píxeles, chat y etiquetas de terceros; responder al toque al instante y que el servidor confirme después.',
+    imp: 'El "Agregar" responde al toque; métricas web-vitals en GA4 por página.' },
+  { k: 'UX14', ind: 'UXCS', crit: 'UXCS-4', tipo: 'Proceso en curso', prio: 'Media', hor: 'Mediano plazo', lim: '2026-12-18', resp: 'D1 (Tech)',
+    desc: 'CLS (0,14 → ≤ 0,1): reservar alto y ancho para imágenes y banners; que nada empuje el contenido ya cargado; fuentes con métricas ajustadas al reemplazo.',
+    imp: 'La página no se mueve mientras carga y el usuario no toca lo que no quería.' },
+  { k: 'UX15', ind: 'UXCS', crit: 'UXCS-1', tipo: 'Proceso en curso', prio: 'Alta', hor: 'Mediano plazo', lim: '2026-12-18', resp: 'D1 (Tech)',
+    desc: 'TTFB (1,3 s → ≤ 0,8 s): servir home y categorías desde caché en CDN; caché de catálogo y precios por zona; eliminar redirecciones de dominios viejos (domicilios.tiendasd1.com).',
+    imp: 'El servidor responde antes de que empiece a cargar la página.' }
+];
+var MARCA_UX = '[ACUERDO UX D1] ';
+
+/**
+ * Carga los acuerdos de UX en Alertas_QuickWins_Acciones (con ID) y en Seguimiento (criterio, horizonte, delta).
+ * Se puede ejecutar más de una vez: no duplica los que ya estén cargados.
+ */
+function cargarAcuerdosUX() {
+  var ss = ss_(), al = ss.getSheetByName(SH_ALERTAS), seg = ss.getSheetByName(SH_SEG);
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var last = al.getLastRow();
+    var vals = last > 1 ? al.getRange(2, 1, last - 1, COL_ID).getValues() : [];
+    var ya = {}; vals.forEach(function (v) { var m = String(v[5]).match(/^\[ACUERDO UX D1\] (UX\d\d)/); if (m) ya[m[1]] = true; });
+    var segIds = seg.getLastRow() > 1 ? seg.getRange(2, 1, seg.getLastRow() - 1, 1).getValues().map(function (v) { return String(v[0]); }) : [];
+    var max = vals.map(function (v) { return String(v[COL_ID - 1]); }).concat(segIds)
+      .reduce(function (m, id) { return Math.max(m, parseInt(id.slice(1), 10) || 0); }, 0);
+    var ts = now_(), mes = Utilities.formatDate(new Date(), TZ, 'yyyy-MM'), n = 0;
+    ACUERDOS_UX.forEach(function (a) {
+      if (ya[a.k]) return;
+      var id = 'S' + ('0' + (++max)).slice(-2);
+      var desc = MARCA_UX + a.k + ' · ' + a.desc;
+      al.appendRow([mes, 'D1', a.ind, a.tipo, a.prio, desc, a.imp, a.resp, ts, a.lim, 'Pendiente', id]);
+      var rec = {
+        id: id, criterio: a.crit, horizonte: a.hor, delta: deltaDef_(a.prio, 'Pendiente', desc), fecha_alta: ts, estado: 'Pendiente',
+        comentario: '', fecha_estado: '', fecha_realizado: '', validacion: 'Sin enviar', validado_por: '', fecha_validacion: '',
+        comentario_validacion: '', horas_resolucion: '', horas_validacion: ''
+      };
+      seg.appendRow(SEG_COLS.map(function (k) { return rec[k]; }));
+      log_({ usuario: 'Rebold', role: 'rebold' }, 'Alta de hallazgo', rec, '', 'Pendiente', 'Acuerdo UX con D1 · ' + a.tipo + ' · ' + a.prio);
+      n++;
+    });
+    Logger.log('Acuerdos de UX cargados: ' + n + (n < ACUERDOS_UX.length ? ' (' + (ACUERDOS_UX.length - n) + ' ya estaban)' : ''));
+  } finally { lock.releaseLock(); }
+}
 
 /* ---------------- Resumen semanal por correo ---------------- */
 /**
@@ -496,22 +591,24 @@ function armarResumen_(d) {
   var hace7 = Utilities.formatDate(new Date(Date.now() - 7 * 864e5), TZ, "yyyy-MM-dd'T'HH:mm:ss");
   var dias = function (a, b) { return Math.round((new Date(b + 'T12:00:00') - new Date(String(a).slice(0, 10) + 'T12:00:00')) / 864e5); };
   var R = d.recomendaciones.filter(function (r) { return r.estado !== 'Descartado' && r.validacion !== 'Cierre ratificado' && r.validacion !== 'Aprobado'; });
-  var esZelva = function (r) { return /zelva/i.test(r.responsable); };
-  var esD1 = function (r) { return !esZelva(r) && /d1/i.test(r.responsable); };
+  var esZelva = function (r) { return puedeReportar_('zelva', r.responsable); };
+  var esD1 = function (r) { return puedeReportar_('d1', r.responsable); };
   var sinCerrar = function (r) { return ['Realizado', 'No se pudo realizar'].indexOf(r.estado) < 0; };
   var prio = function (a, b) { return (a.prioridad === 'Alta' ? 0 : 1) - (b.prioridad === 'Alta' ? 0 : 1) || String(a.fecha_limite).localeCompare(String(b.fecha_limite)); };
 
   var zVenc = R.filter(function (r) { return esZelva(r) && sinCerrar(r) && r.fecha_limite && r.fecha_limite < hoy; }).sort(prio);
   var zSemana = R.filter(function (r) { return esZelva(r) && sinCerrar(r) && r.fecha_limite >= hoy && r.fecha_limite <= en7; }).sort(prio);
-  var zDevueltos = R.filter(function (r) { return r.validacion === 'Devuelto'; }).sort(prio);
-  var zApoyo = R.filter(function (r) { return r.validacion === 'Apoyo en gestión'; }).sort(prio);
-  var zNotas = R.filter(function (r) { return r.nota_rebold && (r.nota_rebold.editado || r.nota_rebold.ts) >= hace7; }).sort(prio);
+  var devueltos = function (f) { return R.filter(function (r) { return f(r) && r.validacion === 'Devuelto'; }).sort(prio); };
+  var apoyos = function (f) { return R.filter(function (r) { return f(r) && r.validacion === 'Apoyo en gestión'; }).sort(prio); };
+  var notas = function (f) { return R.filter(function (r) { return f(r) && r.nota_rebold && (r.nota_rebold.editado || r.nota_rebold.ts) >= hace7; }).sort(prio); };
   var nuevos = d.recomendaciones.filter(function (r) { return String(r.fecha_alta) >= hace7; }).sort(prio);
   var rValidar = R.filter(function (r) { return r.estado === 'Realizado' && r.validacion === 'Pendiente validación'; })
     .sort(function (a, b) { return String(a.fecha_estado).localeCompare(String(b.fecha_estado)); });
   var rApoyo = R.filter(function (r) { return r.estado !== 'Realizado' && r.validacion === 'Pendiente validación'; })
     .sort(function (a, b) { return String(a.fecha_estado).localeCompare(String(b.fecha_estado)); });
   var d1Venc = R.filter(function (r) { return esD1(r) && sinCerrar(r) && r.fecha_limite && r.fecha_limite < hoy; }).sort(prio);
+  var d1Semana = R.filter(function (r) { return esD1(r) && sinCerrar(r) && r.fecha_limite >= hoy && r.fecha_limite <= en7; }).sort(prio);
+  var vencidosTot = R.filter(function (r) { return sinCerrar(r) && r.fecha_limite && r.fecha_limite < hoy; }).length;
 
   var oriHoy = oriResumen_(d, false), oriPot = oriResumen_(d, true), oriBase = oriResumen_({ base: d.base, recomendaciones: [], fecha_base: d.fecha_base }, false);
   var aprob = d.recomendaciones.filter(function (r) { return r.validacion === 'Aprobado'; }).length;
@@ -537,6 +634,22 @@ function armarResumen_(d) {
   var h3 = function (t, n, color) { return '<h3 style="margin:18px 0 2px;font-size:14px;color:' + C.ink + '">' + t + ' <span style="display:inline-block;min-width:20px;padding:0 7px;border-radius:10px;background:' + (color || C.accent) + ';color:#fff;font-size:12px;text-align:center">' + n + '</span></h3>'; };
   var h2 = function (t, s) { return '<h2 style="margin:28px 0 0;padding-top:16px;border-top:2px solid ' + C.ink + ';font-size:17px;text-transform:uppercase;letter-spacing:.03em;color:' + C.ink + '">' + t + '</h2><p style="margin:4px 0 0;color:' + C.dim + ';font-size:13px">' + s + '</p>'; };
 
+  var quien = function (r) { return esD1(r) && !esZelva(r) ? 'D1' : esZelva(r) && !esD1(r) ? 'Zelva' : 'Zelva/D1'; };
+  // Bloque de un equipo: vencidos, vencen esta semana, devueltos, apoyos respondidos y comentarios de Rebold.
+  var equipo = function (titulo, sub, f, venc, semana) {
+    var dv = devueltos(f), ap = apoyos(f), nt = notas(f);
+    return h2(titulo, sub) +
+      h3('Fecha límite cumplida, sin cerrar', venc.length) +
+      tabla(venc, function (r) { return r.indicador + ' · ' + r.prioridad + ' · límite ' + fd(r.fecha_limite) + ' (' + dias(r.fecha_limite, hoy) + ' días) · ' + r.estado; }) +
+      h3('Vencen esta semana', semana.length, C.warn) +
+      tabla(semana, function (r) { return r.indicador + ' · ' + r.prioridad + ' · límite ' + fd(r.fecha_limite) + ' · ' + r.estado; }) +
+      h3('Devueltos por Rebold para completar', dv.length, C.warn) +
+      tabla(dv, function (r) { return 'Rebold: ' + esc_(corte_(r.comentario_validacion, 180)); }) +
+      h3('Pedidos de apoyo ya respondidos por Rebold', ap.length, C.ok) +
+      tabla(ap, function (r) { return 'Respuesta: ' + esc_(corte_(r.comentario_validacion, 180)); }) +
+      h3('Comentarios de Rebold sobre ajustes en curso', nt.length, C.ok) +
+      tabla(nt, function (r) { return r.estado + ' · Rebold: ' + esc_(corte_(r.nota_rebold.texto, 200)); });
+  };
   var html = '<div style="font-family:Arial,Helvetica,sans-serif;max-width:680px;margin:0 auto;color:' + C.ink + '">' +
     '<div style="background:#000;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0"><div style="font-size:12px;letter-spacing:.12em;color:#E04A70;font-weight:700">D1 · REBOLD AUDIT</div>' +
     '<div style="font-size:20px;font-weight:700;margin-top:4px">Resumen semanal de ajustes</div><div style="font-size:12px;color:#a6a6a8;margin-top:2px">Corte: ' + fd(hoy) + '/' + hoy.slice(0, 4) + '</div></div>' +
@@ -544,32 +657,21 @@ function armarResumen_(d) {
     '<p style="margin:0 0 14px;font-size:14px;line-height:1.5">Hola equipo, este es el resumen de la semana: lo que falta de cada lado para seguir moviendo el ORI. Si algo necesita apoyo, márquenlo como <b>Necesita apoyo</b> en el cuadro de mando o respondan este correo.</p>' +
     '<table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;text-align:center"><tr>' +
     kpi_('ORI validado', fmt(oriHoy), 'base ' + fmt(oriBase), C) + kpi_('Potencial', fmt(oriPot), 'si se aprueba lo pendiente', C) +
-    kpi_('Aprobados', aprob, 'de ' + (aprob + R.length) + ' activos', C) + kpi_('Vencidos', zVenc.length + d1Venc.length, 'sin cerrar', C) +
+    kpi_('Aprobados', aprob, 'de ' + (aprob + R.length) + ' activos', C) + kpi_('Vencidos', vencidosTot, 'sin cerrar', C) +
     '</tr></table>' +
 
-    h2('Lo que falta de Zelva', 'Ajustes en plataformas y pixelación.') +
-    h3('Fecha límite cumplida, sin cerrar', zVenc.length) +
-    tabla(zVenc, function (r) { return r.indicador + ' · ' + r.prioridad + ' · límite ' + fd(r.fecha_limite) + ' (' + dias(r.fecha_limite, hoy) + ' días) · ' + r.estado; }) +
-    h3('Vencen esta semana', zSemana.length, C.warn) +
-    tabla(zSemana, function (r) { return r.indicador + ' · ' + r.prioridad + ' · límite ' + fd(r.fecha_limite) + ' · ' + r.estado; }) +
-    h3('Devueltos por Rebold para completar', zDevueltos.length, C.warn) +
-    tabla(zDevueltos, function (r) { return 'Rebold: ' + esc_(corte_(r.comentario_validacion, 180)); }) +
-    h3('Pedidos de apoyo ya respondidos por Rebold', zApoyo.length, C.ok) +
-    tabla(zApoyo, function (r) { return 'Respuesta: ' + esc_(corte_(r.comentario_validacion, 180)); }) +
-    h3('Comentarios de Rebold sobre ajustes en curso', zNotas.length, C.ok) +
-    tabla(zNotas, function (r) { return r.estado + ' · Rebold: ' + esc_(corte_(r.nota_rebold.texto, 200)); }) +
-    h3('Hallazgos nuevos de la última semana', nuevos.length, C.dim) +
-    tabla(nuevos, function (r) { return r.tipo + ' · ' + r.indicador + ' · límite ' + fd(r.fecha_limite) + ' · ' + esc_(r.responsable); }) +
+    equipo('Lo que falta de Zelva', 'Ajustes en plataformas y pixelación.', esZelva, zVenc, zSemana) +
+    equipo('Lo que falta de D1', 'Sitio web, app, UX y accesos a cargo del equipo de D1.', esD1, d1Venc, d1Semana) +
 
     h2('Lo que falta de Rebold', 'Validaciones y respuestas que nos corresponden.') +
     h3('Realizados esperando nuestra validación', rValidar.length) +
-    tabla(rValidar, function (r) { return 'Reportado ' + fd(r.fecha_estado) + ' · esperando ' + dias(r.fecha_estado, hoy) + ' días · ' + esc_(corte_(r.comentario, 140)); }) +
+    tabla(rValidar, function (r) { return quien(r) + ' reportó ' + fd(r.fecha_estado) + ' · esperando ' + dias(r.fecha_estado, hoy) + ' días · ' + esc_(corte_(r.comentario, 140)); }) +
     h3('Pedidos de apoyo o cierres sin responder', rApoyo.length) +
-    tabla(rApoyo, function (r) { return r.estado + ' · ' + fd(r.fecha_estado) + ' · Zelva: ' + esc_(corte_(r.comentario, 140)); }) +
+    tabla(rApoyo, function (r) { return r.estado + ' · ' + fd(r.fecha_estado) + ' · ' + quien(r) + ': ' + esc_(corte_(r.comentario, 140)); }) +
 
-    h2('Dependen de D1', 'Accesos y desarrollo que gestionamos con D1.') +
-    h3('Fecha límite cumplida', d1Venc.length, C.dim) +
-    tabla(d1Venc, function (r) { return r.indicador + ' · límite ' + fd(r.fecha_limite) + ' · ' + esc_(r.responsable) + ' · ' + r.estado; }) +
+    h2('Hallazgos nuevos', 'Registrados en la última semana.') +
+    h3('Nuevos', nuevos.length, C.dim) +
+    tabla(nuevos, function (r) { return r.tipo + ' · ' + r.indicador + ' · límite ' + fd(r.fecha_limite) + ' · ' + esc_(r.responsable); }) +
 
     (url ? '<p style="margin:24px 0 6px;text-align:center"><a href="' + url + '" style="display:inline-block;background:' + C.accent + ';color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:700;font-size:14px">Abrir el cuadro de mando</a></p>' : '') +
     '<p style="margin:16px 0 0;font-size:11px;color:' + C.dim + ';text-align:center">Resumen automático de los lunes · Rebold · A Post Digital Marketing &amp; Communication Company</p>' +

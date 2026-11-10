@@ -62,6 +62,12 @@ Al agregar filas en `Alertas_QuickWins_Acciones` hay dos caminos y los dos sirve
 
 `limpiarDuplicadosSeguimiento()` borra filas repetidas de un mismo ID en `Seguimiento`, conservando la primera, y solo si la repetida nunca tuvo movimiento.
 
+## Ajustes a cargo de D1
+
+Desde la versión 2.4.0 el equipo de D1 entra con su propio código (`D1_CODE`) y reporta los ajustes cuyo responsable incluye "D1" (por ejemplo "D1 (UX)", "D1 (Tech)" o "D1 + Zelva"). Zelva reporta los que dicen "Zelva" o no nombran a D1. Los compartidos los puede reportar cualquiera de los dos. Todo pasa igual por la validación de Rebold.
+
+`cargarAcuerdosUX()` carga los 15 acuerdos del diagnóstico UX (11 de la reunión y 4 del plan técnico de Core Web Vitals) en `Alertas_QuickWins_Acciones` y `Seguimiento`, marcados con `[ACUERDO UX D1]`. Se puede volver a ejecutar sin duplicarlos.
+
 ## Resumen semanal por correo
 
 Todos los lunes a las 10:00 (hora de Bogotá) el script envía un resumen con lo que falta de cada lado:

@@ -265,13 +265,13 @@ footer{border-top:1px solid var(--line);padding:18px 0;color:var(--ink3);font-si
       <div>
         <p class="kicker">03 · Seguimiento de optimizaciones</p>
         <h1>Qué se ajustó, quién lo valida y qué falta</h1>
-        <p class="lead">Las alertas, quick wins y procesos de la auditoría. Zelva marca cada uno como realizado, en curso, con necesidad de apoyo o no realizable, con el porqué. Cada cambio notifica a Rebold por Slack.</p>
+        <p class="lead">Las alertas, quick wins y procesos de la auditoría. Zelva y D1 marcan cada ajuste a su cargo como realizado, en curso, con necesidad de apoyo o no realizable, con el porqué. Cada cambio notifica a Rebold por Slack y Rebold lo valida.</p>
       </div>
       <button class="btn pri" id="btnAdd" hidden>+ Nuevo hallazgo</button>
     </div>
     <div class="flow" style="margin-bottom:16px">
       <span>Rebold registra hallazgo <em>(fecha y hora)</em></span><em>→</em>
-      <span>Zelva reporta estado + porqué</span><em>→</em>
+      <span>Zelva o D1 reportan estado + porqué</span><em>→</em>
       <span>Slack a Rebold</span><em>→</em>
       <span style="border-color:var(--s-ok);color:var(--s-ok)">Rebold aprueba → se mueve el ORI</span>
     </div>
@@ -279,6 +279,7 @@ footer{border-top:1px solid var(--line);padding:18px 0;color:var(--ink3);font-si
       <label>Buscar<input type="search" id="fQ" placeholder="Texto o ID…"></label>
       <label>Tipo<select id="fTipo"></select></label>
       <label>Prioridad<select id="fPrio"></select></label>
+      <label>Equipo<select id="fEq"><option value="">Todos</option><option value="zelva">Zelva</option><option value="d1">D1</option></select></label>
       <label>Responsable<select id="fResp"></select></label>
       <label>Indicador<select id="fInd"></select></label>
       <label>Criterio<select id="fCrit"></select></label>
@@ -353,7 +354,7 @@ footer{border-top:1px solid var(--line);padding:18px 0;color:var(--ink3);font-si
 <div class="toasts" id="toasts"></div>
 <div class="modal" id="login"><div class="card">
   <p class="kicker">Acceso</p><h2>D1 · Rebold Audit</h2>
-  <p class="muted" style="font-size:13px">Escribe tu nombre y el código de acceso que te dio Rebold. El código define si entras como Zelva, Rebold o solo lectura.</p>
+  <p class="muted" style="font-size:13px">Escribe tu nombre y el código de acceso que te dio Rebold. El código define si entras como Zelva, D1, Rebold o solo lectura.</p>
   <div class="field">Nombre<input id="lgName" autocomplete="name"></div>
   <div class="field">Código de acceso<input id="lgCode" type="password" autocomplete="off"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px"><span class="dim" id="lgErr" style="font-size:12px"></span><button class="btn pri" id="lgGo">Entrar</button></div>
@@ -389,7 +390,10 @@ const VALS = {
   'Cierre ratificado': 'info', 'Apoyo en gestión': 'info',
 };
 const HORS = ['Quick win', 'Mediano plazo', 'Largo plazo'];
-const ROLES = { zelva: 'Zelva', rebold: 'Rebold', lectura: 'Solo lectura' };
+const ROLES = { zelva: 'Zelva', rebold: 'Rebold', d1: 'D1', lectura: 'Solo lectura' };
+// Quién reporta cada ajuste según su responsable (igual que puedeReportar_ en Apps Script).
+const puedeReportar = (role, resp) => role === 'd1' ? /d1/i.test(resp || '') : role === 'zelva' ? (/zelva/i.test(resp || '') || !/d1/i.test(resp || '')) : false;
+const equipoDe = resp => { const z = puedeReportar('zelva', resp), d = puedeReportar('d1', resp); return z && d ? 'Zelva y D1' : d ? 'D1' : 'Zelva'; };
 
 /* ===================== Estado ===================== */
 let D = null;          // datos: indicadores, criterios, rubrica, base, recomendaciones, log
@@ -617,8 +621,8 @@ function setupFilters() {
   fillSelect($('#fEst'), Object.keys(ESTADOS));
   fillSelect($('#fVal'), Object.keys(VALS));
   updateCritFilter();
-  ['fQ', 'fTipo', 'fPrio', 'fResp', 'fInd', 'fCrit', 'fHor', 'fEst', 'fVal', 'fFecha', 'fDesde', 'fHasta'].forEach(id => $('#' + id).addEventListener(id === 'fQ' ? 'input' : 'change', () => { if (id === 'fInd') updateCritFilter(); renderSeg(); }));
-  $('#fClear').onclick = () => { ['fQ', 'fTipo', 'fPrio', 'fResp', 'fInd', 'fCrit', 'fHor', 'fEst', 'fVal', 'fDesde', 'fHasta'].forEach(id => $('#' + id).value = ''); updateCritFilter(); renderSeg(); };
+  ['fQ', 'fEq', 'fTipo', 'fPrio', 'fResp', 'fInd', 'fCrit', 'fHor', 'fEst', 'fVal', 'fFecha', 'fDesde', 'fHasta'].forEach(id => $('#' + id).addEventListener(id === 'fQ' ? 'input' : 'change', () => { if (id === 'fInd') updateCritFilter(); renderSeg(); }));
+  $('#fClear').onclick = () => { ['fQ', 'fEq', 'fTipo', 'fPrio', 'fResp', 'fInd', 'fCrit', 'fHor', 'fEst', 'fVal', 'fDesde', 'fHasta'].forEach(id => $('#' + id).value = ''); updateCritFilter(); renderSeg(); };
 }
 function updateCritFilter() {
   const ind = $('#fInd').value;
@@ -639,6 +643,7 @@ function renderSeg() {
   const ff = $('#fFecha').value, fd = $('#fDesde').value, fa = $('#fHasta').value, ft = $('#fTipo').value, fp = $('#fPrio').value, fr = $('#fResp').value;
   const list = D.recomendaciones.filter(r => {
     if (fi && r.indicador !== fi) return false; if (fc && r.criterio !== fc) return false;
+    const fe2 = $('#fEq').value; if (fe2 && !puedeReportar(fe2, r.responsable)) return false;
     if (ft && r.tipo !== ft) return false; if (fp && r.prioridad !== fp) return false; if (fr && r.responsable !== fr) return false;
     if (fh && r.horizonte !== fh) return false; if (fe && r.estado !== fe) return false; if (fv && r.validacion !== fv) return false;
     if (q && !(r.id + ' ' + r.titulo + ' ' + r.impacto + ' ' + r.responsable).toLowerCase().includes(q)) return false;
@@ -654,7 +659,7 @@ function renderSeg() {
     const c = critById(r.criterio);
     return `<tr class="click" data-id="${r.id}">
       <td data-l="ID"><b style="font-weight:600">${r.id}</b></td>
-      <td class="ttl" data-l="Hallazgo" style="min-width:260px;max-width:420px"><div class="clamp">${esc(r.titulo)}</div><div class="dim" style="font-size:11px">${esc(r.responsable)}</div></td>
+      <td class="ttl" data-l="Hallazgo" style="min-width:260px;max-width:420px"><div class="clamp">${esc(r.titulo)}</div><div class="dim" style="font-size:11px">${esc(r.responsable)} · <b style="font-weight:500">${equipoDe(r.responsable)}</b></div></td>
       <td data-l="Tipo">${tipoChip(r.tipo)}<div class="dim" style="font-size:11px">${esc(r.prioridad)}</div></td>
       <td data-l="Indicador">${r.indicador}<div class="dim" style="font-size:11px">${esc(c ? c.nombre : 'Sin criterio')}</div></td>
       <td data-l="Horizonte">${horChip(r.horizonte)}</td>
@@ -680,9 +685,11 @@ function openRec(id) {
   let act = '';
   if (!LIVE) {
     act = `<div class="note mt">Vista de consulta. Para reportar o validar, el cuadro de mando debe estar conectado al backend con un código de acceso.</div>`;
-  } else if (USER.role === 'zelva' && !locked) {
+  } else if ((USER.role === 'zelva' || USER.role === 'd1') && !locked && !puedeReportar(USER.role, r.responsable)) {
+    act = `<div class="note mt">Este ajuste está a cargo de <b>${esc(r.responsable)}</b>. Lo reporta ${equipoDe(r.responsable)}.</div>`;
+  } else if ((USER.role === 'zelva' || USER.role === 'd1') && !locked) {
     const opts = ['En curso', 'Realizado', 'Necesita apoyo', 'No se pudo realizar'];
-    act = `<div class="box"><h3>Reportar avance (Zelva)</h3>
+    act = `<div class="box"><h3>Reportar avance (${ROLES[USER.role]})</h3>
       <div class="opts" id="stOpts">${opts.map(o => `<button data-v="${o}" class="${r.estado === o ? 'on' : ''}"><i style="width:9px;height:9px;border-radius:50%;background:${ESTADOS[o].c};display:inline-block"></i>${o}</button>`).join('')}</div>
       <div class="field"><span id="stHint">Comentario</span><textarea id="stCom" placeholder="Qué se hizo, qué falta o por qué no se pudo…"></textarea></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px"><span class="dim" style="font-size:11px">Se notifica a Rebold por Slack. No mueve el ORI hasta que Rebold lo apruebe.</span><button class="btn pri" id="stGo">Enviar</button></div></div>`;
